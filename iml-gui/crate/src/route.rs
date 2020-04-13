@@ -63,6 +63,7 @@ pub enum Route<'a> {
     Users,
     User(RouteId<'a>),
     Volumes,
+    ServerVolumes(RouteId<'a>),
     Volume(RouteId<'a>),
     Devices,
     Device(RouteId<'a>),
@@ -94,6 +95,7 @@ impl<'a> Route<'a> {
             Self::Users => vec!["users"],
             Self::User(id) => vec!["users", id],
             Self::Volumes => vec!["volumes"],
+            Self::ServerVolumes(id) => vec!["servers", id, "volumes"],
             Self::Volume(id) => vec!["volumes", id],
             Self::Devices => vec!["devices"],
             Self::Device(id) => vec!["devices", id],
@@ -158,7 +160,11 @@ impl<'a> From<Url> for Route<'a> {
             Some("power_control") => Self::PowerControl,
             Some("servers") => match path.next() {
                 None => Self::Servers,
-                Some(id) => Self::Server(RouteId::from(id)),
+                Some(id) => match path.next().as_deref() {
+                    Some("volumes") => Self::ServerVolumes(RouteId::from(id)),
+                    None => Self::Server(RouteId::from(id)),
+                    _ => Self::NotFound,
+                },
             },
             Some("targets") => match path.next() {
                 None => Self::Targets,

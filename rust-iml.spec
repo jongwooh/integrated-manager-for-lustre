@@ -4,7 +4,7 @@ BuildRequires: systemd
 %global crate iml
 
 Name: rust-%{crate}
-Version: 0.1.2
+Version: 0.2.0
 # Release Start
 Release: 1%{?dist}
 # Release End
@@ -33,6 +33,7 @@ cp iml-agent-daemon %{buildroot}%{_bindir}
 cp iml-api %{buildroot}%{_bindir}
 cp iml-devices %{buildroot}%{_bindir}
 cp iml-ostpool %{buildroot}%{_bindir}
+cp iml-device %{buildroot}%{_bindir}
 cp iml-stats %{buildroot}%{_bindir}
 cp iml-agent-comms %{buildroot}%{_bindir}
 cp iml-action-runner %{buildroot}%{_bindir}
@@ -42,6 +43,7 @@ cp iml-postoffice %{buildroot}%{_bindir}
 mkdir -p %{buildroot}%{_unitdir}
 cp iml-api.service %{buildroot}%{_unitdir}
 cp iml-devices.service %{buildroot}%{_unitdir}
+cp iml-device.service %{buildroot}%{_unitdir}
 cp iml-ostpool.service %{buildroot}%{_unitdir}
 cp iml-rust-stats.service %{buildroot}%{_unitdir}
 cp iml-agent-comms.service %{buildroot}%{_unitdir}
@@ -295,6 +297,28 @@ systemctl preset iml-postoffice.service
 %files postoffice
 %{_bindir}/iml-postoffice
 %attr(0644,root,root)%{_unitdir}/iml-postoffice.service
+
+%package device
+Summary: Consumer of IML Agent device push queue
+License: MIT
+Group: System Environment/Libraries
+Requires: rust-iml-agent-comms
+
+%description device
+%{summary}
+
+%post device
+systemctl preset iml-device.service
+
+%preun device
+%systemd_preun iml-device.service
+
+%postun device
+%systemd_postun_with_restart iml-device.service
+
+%files device
+%{_bindir}/iml-device
+%attr(0644,root,root)%{_unitdir}/iml-device.service
 
 %changelog
 * Wed Mar 6 2019 Joe Grund <jgrund@whamcloud.com> - 0.1.0-1

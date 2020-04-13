@@ -352,21 +352,18 @@ pub async fn populate_from_db(
 
     tracing::debug!("Built initial db statements");
 
-    let fut1 = future::try_join5(
-        into_row(client.query_raw(&stmts[0], iter::empty()).await?),
-        into_row(client.query_raw(&stmts[1], iter::empty()).await?),
-        into_row(client.query_raw(&stmts[2], iter::empty()).await?),
-        into_row(client.query_raw(&stmts[3], iter::empty()).await?),
-        into_row(client.query_raw(&stmts[4], iter::empty()).await?),
-    );
+    let managed_target_mount = into_row(client.query_raw(&stmts[0], iter::empty()).await?).await?;
+    let stratagem_configuration =
+        into_row(client.query_raw(&stmts[1], iter::empty()).await?).await?;
+    let lnet_configuration = into_row(client.query_raw(&stmts[2], iter::empty()).await?).await?;
+    let volume = into_row(client.query_raw(&stmts[3], iter::empty()).await?).await?;
+    let volume_node = into_row(client.query_raw(&stmts[4], iter::empty()).await?).await?;
 
-    let fut2 = future::try_join5(
-        into_row(client.query_raw(&stmts[5], iter::empty()).await?),
-        into_row(client.query_raw(&stmts[6], iter::empty()).await?),
-        into_row(client.query_raw(&stmts[7], iter::empty()).await?),
-        into_row(client.query_raw(&stmts[8], iter::empty()).await?),
-        into_row(client.query_raw(&stmts[9], iter::empty()).await?),
-    );
+    let ost_pool = into_row(client.query_raw(&stmts[5], iter::empty()).await?).await?;
+    let ost_pool_osts = into_row(client.query_raw(&stmts[6], iter::empty()).await?).await?;
+    let content_types = into_row(client.query_raw(&stmts[7], iter::empty()).await?).await?;
+    let groups = into_row(client.query_raw(&stmts[8], iter::empty()).await?).await?;
+    let users = into_row(client.query_raw(&stmts[9], iter::empty()).await?).await?;
 
     let fut3 = future::try_join5(
         into_row(client.query_raw(&stmts[10], iter::empty()).await?),

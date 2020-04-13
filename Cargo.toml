@@ -1,11 +1,12 @@
 [workspace]
 members = [
-    'iml-agent-comms',
     'iml-agent',
-    'iml-api-utils',
+    'iml-agent-comms',
     'iml-api',
+    'iml-api-utils',
     'iml-cmd',
     'iml-fs',
+    'iml-influx',
     'iml-job-scheduler-rpc',
     'iml-mailbox',
     'iml-manager-cli',
@@ -17,6 +18,7 @@ members = [
     'iml-request-retry',
     'iml-services/iml-action-runner',
     'iml-services/iml-devices',
+    'iml-services/iml-device',
     'iml-services/iml-ostpool',
     'iml-services/iml-postoffice',
     'iml-services/iml-service-queue',

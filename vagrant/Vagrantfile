@@ -11,6 +11,17 @@ ISCSI_MEM = (ENV['ISCSI_MEM'] || 1024).freeze
 # Num CPUs allocated to the iSCSI server VM
 ISCSI_CPU = (ENV['ISCSI_CPU'] || 4).freeze
 
+# User is required (default to root)
+# need either password or sshkey (or will assume sshkey)
+VBOX_USER   = (ENV['VBOX_USER']   || "root").freeze
+VBOX_PASSWD = (ENV['VBOX_PASSWD'] || "").freeze
+VBOX_SSHKEY = (ENV['VBOX_SSHKEY'] || "").freeze
+
+# Lustre version
+LUSTRE = (ENV['LUSTRE'] || "2.12.4").freeze
+
+REPO_URI = (ENV['REPO_URI'] || '').freeze
+
 require 'open3'
 require 'fileutils'
 
@@ -124,6 +135,15 @@ Vagrant.configure('2') do |config|
                            ]
 
     # Install IML onto the admin node
+    # Using a given repouri
+    adm.vm.provision 'install-iml-repouri',
+                     type: 'shell',
+                     run: 'never',
+                     path: 'scripts/install_iml_repouri.sh',
+                     env: {"REPO_URI" => REPO_URI}
+
+
+    # Install IML onto the admin node
     # Using the mfl devel repo
     adm.vm.provision 'install-iml-devel',
                      type: 'shell',
@@ -146,6 +166,14 @@ Vagrant.configure('2') do |config|
                      run: 'never',
                      path: 'scripts/install_iml.sh',
                      args: 'https://github.com/whamcloud/integrated-manager-for-lustre/releases/download/v5.1.0/chroma_support.repo'
+
+    # Install IML 6.0 onto the admin node
+    # Using the mfl 6.0 repo
+    adm.vm.provision 'install-iml-6.0',
+                     type: 'shell',
+                     run: 'never',
+                     path: 'scripts/install_iml.sh',
+                     args: 'https://github.com/whamcloud/integrated-manager-for-lustre/releases/download/v6.0.0/chroma_support.repo'
 
     # Install IML 4.0.10.x onto the admin node
     # Using the mfl 4.0.10 copr repo
@@ -253,11 +281,11 @@ Vagrant.configure('2') do |config|
                          type: 'shell',
                          run: 'never',
                          inline: <<-SHELL
-                           mkfs.lustre --failover 10.73.20.12@tcp --mgs --backfstype=zfs mgt/mgt
+                           mkfs.lustre --servicenode 10.73.20.11@tcp:10.73.20.12@tcp --mgs --backfstype=zfs mgt/mgt
                            mkdir -p /lustre/zfsmo/mgs
                            mount -t lustre mgt/mgt /lustre/zfsmo/mgs
 
-                           mkfs.lustre --reformat --failover 10.73.20.12@tcp --mdt --backfstype=zfs --fsname=zfsmo --index=0 --mgsnode=10.73.20.11@tcp mdt0/mdt0
+                           mkfs.lustre --reformat --failover 10.73.20.12@tcp --mdt --backfstype=zfs --fsname=zfsmo --index=0 --mgsnode=10.73.20.11@tcp:10.73.20.12@tcp mdt0/mdt0
                            mkdir -p /lustre/zfsmo/mdt0
                            mount -t lustre mdt0/mdt0 /lustre/zfsmo/mdt0
                          SHELL
@@ -267,7 +295,7 @@ Vagrant.configure('2') do |config|
                          run: 'never',
                          inline: <<-SHELL
                               mkfs.lustre --mgs --reformat --servicenode=10.73.20.11@tcp --servicenode=10.73.20.12@tcp /dev/mapper/mpatha
-                              mkfs.lustre --mdt --reformat --servicenode=10.73.20.11@tcp --servicenode=10.73.20.12@tcp --index=0 --mgsnode=10.73.20.11@tcp --fsname=fs /dev/mapper/mpathb
+                              mkfs.lustre --mdt --reformat --servicenode=10.73.20.11@tcp --servicenode=10.73.20.12@tcp --index=0 --mgsnode=10.73.20.11@tcp:10.73.20.12@tcp --fsname=fs /dev/mapper/mpathb
                          SHELL
 
         mds.vm.provision 'mount-ldiskfs-fs',
@@ -280,6 +308,27 @@ Vagrant.configure('2') do |config|
                            mount -t lustre /dev/mapper/mpathb /mnt/mdt0
                          SHELL
 
+        mds.vm.provision 'create-ldiskfs-lvm-fs',
+                         type: 'shell',
+                         run: 'never',
+                         path: 'scripts/create_ldiskfs_lvm_fs.sh',
+                         args: ['fs', '/dev/mapper/mpathb', 0, '/dev/mapper/mpatha']
+
+        mds.vm.provision 'mount-ldiskfs-lvm-fs',
+                         type: 'shell',
+                         run: 'never',
+                         inline: <<-SHELL
+                           mkdir -p /mnt/mgs
+                           mkdir -p /mnt/mdt0
+                           mount -t lustre /dev/mapper/mgt_vg-mgt /mnt/mgs
+                           mount -t lustre /dev/mapper/mdt0_vg-mdt /mnt/mdt0
+                         SHELL
+
+         mds.vm.provision 'ha-ldiskfs-lvm-fs-setup',
+                         type: 'shell',
+                         run: 'never',
+                         path: 'scripts/create_ldiskfs_lvm_mds_ha_setup.sh',
+                         args: [ VBOX_USER, VBOX_PASSWD, VBOX_SSHKEY ]
       else
         mds.vm.provision 'create-pools',
                          type: 'shell',
@@ -289,7 +338,7 @@ Vagrant.configure('2') do |config|
                            zpool create mdt1 -o multihost=on /dev/mapper/mpathc
                          SHELL
 
-      mds.vm.provision 'import-pools',
+        mds.vm.provision 'import-pools',
                          type: 'shell',
                          run: 'never',
                          inline: <<-SHELL
@@ -305,7 +354,7 @@ Vagrant.configure('2') do |config|
                          type: 'shell',
                          run: 'never',
                          inline: <<-SHELL
-                           mkfs.lustre --failover 10.73.20.11@tcp --mdt --backfstype=zfs --fsname=zfsmo --index=1 --mgsnode=10.73.20.11@tcp mdt1/mdt1
+                           mkfs.lustre --failover 10.73.20.11@tcp --mdt --backfstype=zfs --fsname=zfsmo --index=1 --mgsnode=10.73.20.11@tcp:10.73.20.12@tcp mdt1/mdt1
                            mkdir -p /lustre/zfsmo/mdt1
                            mount -t lustre mdt1/mdt1 /lustre/zfsmo/mdt1
                          SHELL
@@ -314,14 +363,14 @@ Vagrant.configure('2') do |config|
                          type: 'shell',
                          run: 'never',
                          inline: <<-SHELL
-                            mkfs.lustre --mdt --reformat --servicenode=10.73.20.11@tcp --servicenode=10.73.20.12@tcp --index=1 --mgsnode=10.73.20.11@tcp --fsname=fs /dev/mapper/mpathc
+                            mkfs.lustre --mdt --reformat --servicenode=10.73.20.11@tcp --servicenode=10.73.20.12@tcp --index=1 --mgsnode=10.73.20.11@tcp:10.73.20.12@tcp --fsname=fs /dev/mapper/mpathc
                          SHELL
 
         mds.vm.provision 'create-ldiskfs-fs2',
                             type: 'shell',
                             run: 'never',
                             inline: <<-SHELL
-                              mkfs.lustre --mdt --reformat --servicenode=10.73.20.11@tcp --servicenode=10.73.20.12@tcp --index=0 --mgsnode=10.73.20.11@tcp --fsname=fs2 /dev/mapper/mpathd
+                              mkfs.lustre --mdt --reformat --servicenode=10.73.20.11@tcp --servicenode=10.73.20.12@tcp --index=0 --mgsnode=10.73.20.11@tcp:10.73.20.12@tcp --fsname=fs2 /dev/mapper/mpathd
                             SHELL
 
         mds.vm.provision 'mount-ldiskfs-fs',
@@ -339,7 +388,34 @@ Vagrant.configure('2') do |config|
                            mkdir -p /mnt/mdt2
                            mount -t lustre /dev/mapper/mpathd /mnt/mdt2
                          SHELL
+
+        mds.vm.provision 'create-ldiskfs-lvm-fs',
+                         type: 'shell',
+                         run: 'never',
+                         path: 'scripts/create_ldiskfs_lvm_fs.sh',
+                         args: ['fs', '/dev/mapper/mpathc', 1, '']
+
+        mds.vm.provision 'mount-ldiskfs-lvm-fs',
+                         type: 'shell',
+                         run: 'never',
+                         inline: <<-SHELL
+                           mkdir -p /mnt/mdt1
+                           mount -t lustre /dev/mapper/mdt1_vg-mdt /mnt/mdt1
+                         SHELL
+
       end
+
+      mds.vm.provision 'ha-ldiskfs-lvm-fs-prep',
+                       type: 'shell',
+                       run: 'never',
+                       inline: <<-SHELL
+                         yum -y  --nogpgcheck install pcs lustre-resource-agents
+                         echo -n lustre | passwd --stdin hacluster
+                         systemctl enable --now pcsd
+                         mkdir -p /mnt/mgs
+                         mkdir -p /mnt/mdt{0,1}
+                       SHELL
+
     end
   end
 
@@ -441,16 +517,16 @@ Vagrant.configure('2') do |config|
                          type: 'shell',
                          run: 'never',
                          inline: <<-SHELL
-                              mkfs.lustre --failover 10.73.20.22@tcp --ost --backfstype=zfs --fsname=zfsmo --index=0 --mgsnode=10.73.20.11@tcp ost0/ost0
-                              mkfs.lustre --failover 10.73.20.22@tcp --ost --backfstype=zfs --fsname=zfsmo --index=1 --mgsnode=10.73.20.11@tcp ost1/ost1
-                              mkfs.lustre --failover 10.73.20.22@tcp --ost --backfstype=zfs --fsname=zfsmo --index=2 --mgsnode=10.73.20.11@tcp ost2/ost2
-                              mkfs.lustre --failover 10.73.20.22@tcp --ost --backfstype=zfs --fsname=zfsmo --index=3 --mgsnode=10.73.20.11@tcp ost3/ost3
-                              mkfs.lustre --failover 10.73.20.22@tcp --ost --backfstype=zfs --fsname=zfsmo --index=4 --mgsnode=10.73.20.11@tcp ost4/ost4
-                              mkfs.lustre --failover 10.73.20.22@tcp --ost --backfstype=zfs --fsname=zfsmo --index=5 --mgsnode=10.73.20.11@tcp ost5/ost5
-                              mkfs.lustre --failover 10.73.20.22@tcp --ost --backfstype=zfs --fsname=zfsmo --index=6 --mgsnode=10.73.20.11@tcp ost6/ost6
-                              mkfs.lustre --failover 10.73.20.22@tcp --ost --backfstype=zfs --fsname=zfsmo --index=7 --mgsnode=10.73.20.11@tcp ost7/ost7
-                              mkfs.lustre --failover 10.73.20.22@tcp --ost --backfstype=zfs --fsname=zfsmo --index=8 --mgsnode=10.73.20.11@tcp ost8/ost8
-                              mkfs.lustre --failover 10.73.20.22@tcp --ost --backfstype=zfs --fsname=zfsmo --index=9 --mgsnode=10.73.20.11@tcp ost9/ost9
+                              mkfs.lustre --failover 10.73.20.22@tcp --ost --backfstype=zfs --fsname=zfsmo --index=0 --mgsnode=10.73.20.11@tcp:10.73.20.12@tcp ost0/ost0
+                              mkfs.lustre --failover 10.73.20.22@tcp --ost --backfstype=zfs --fsname=zfsmo --index=1 --mgsnode=10.73.20.11@tcp:10.73.20.12@tcp ost1/ost1
+                              mkfs.lustre --failover 10.73.20.22@tcp --ost --backfstype=zfs --fsname=zfsmo --index=2 --mgsnode=10.73.20.11@tcp:10.73.20.12@tcp ost2/ost2
+                              mkfs.lustre --failover 10.73.20.22@tcp --ost --backfstype=zfs --fsname=zfsmo --index=3 --mgsnode=10.73.20.11@tcp:10.73.20.12@tcp ost3/ost3
+                              mkfs.lustre --failover 10.73.20.22@tcp --ost --backfstype=zfs --fsname=zfsmo --index=4 --mgsnode=10.73.20.11@tcp:10.73.20.12@tcp ost4/ost4
+                              mkfs.lustre --failover 10.73.20.22@tcp --ost --backfstype=zfs --fsname=zfsmo --index=5 --mgsnode=10.73.20.11@tcp:10.73.20.12@tcp ost5/ost5
+                              mkfs.lustre --failover 10.73.20.22@tcp --ost --backfstype=zfs --fsname=zfsmo --index=6 --mgsnode=10.73.20.11@tcp:10.73.20.12@tcp ost6/ost6
+                              mkfs.lustre --failover 10.73.20.22@tcp --ost --backfstype=zfs --fsname=zfsmo --index=7 --mgsnode=10.73.20.11@tcp:10.73.20.12@tcp ost7/ost7
+                              mkfs.lustre --failover 10.73.20.22@tcp --ost --backfstype=zfs --fsname=zfsmo --index=8 --mgsnode=10.73.20.11@tcp:10.73.20.12@tcp ost8/ost8
+                              mkfs.lustre --failover 10.73.20.22@tcp --ost --backfstype=zfs --fsname=zfsmo --index=9 --mgsnode=10.73.20.11@tcp:10.73.20.12@tcp ost9/ost9
                               mkdir -p /lustre/zfsmo/ost{0..9}
                               mount -t lustre ost0/ost0 /lustre/zfsmo/ost0
                               mount -t lustre ost1/ost1 /lustre/zfsmo/ost1
@@ -500,6 +576,30 @@ Vagrant.configure('2') do |config|
                           mount -t lustre /dev/mapper/mpathj /mnt/ost2-4
                          SHELL
 
+        oss.vm.provision 'create-ldiskfs-lvm-fs',
+                         type: 'shell',
+                         run: 'never',
+                         path: 'scripts/create_ldiskfs_fs_osts.sh',
+                         args: ['a', 'e', 0, 'fs']
+
+        oss.vm.provision 'mount-ldiskfs-lvm-fs',
+                         type: 'shell',
+                         run: 'never',
+                         inline: <<-SHELL
+                          mkdir -p /mnt/ost{0,1,2,3,4}
+                          mount -t lustre /dev/mapper/mpatha /mnt/ost0
+                          mount -t lustre /dev/mapper/mpathb /mnt/ost1
+                          mount -t lustre /dev/mapper/mpathc /mnt/ost2
+                          mount -t lustre /dev/mapper/mpathd /mnt/ost3
+                          mount -t lustre /dev/mapper/mpathe /mnt/ost4
+                         SHELL
+
+        oss.vm.provision 'ha-ldiskfs-lvm-fs-setup',
+                         type: 'shell',
+                         run: 'never',
+                         path: 'scripts/create_ldiskfs_lvm_oss_ha_setup.sh',
+                         args: [ "{a..e} {k..o}", 0, VBOX_USER, VBOX_PASSWD, VBOX_SSHKEY ]
+                         
       else
         oss.vm.provision 'create-pools',
                          type: 'shell',
@@ -543,16 +643,16 @@ Vagrant.configure('2') do |config|
                          type: 'shell',
                          run: 'never',
                          inline: <<-SHELL
-                              mkfs.lustre --failover 10.73.20.21@tcp --ost --backfstype=zfs --fsname=zfsmo --index=10 --mgsnode=10.73.20.11@tcp ost10/ost10
-                              mkfs.lustre --failover 10.73.20.21@tcp --ost --backfstype=zfs --fsname=zfsmo --index=11 --mgsnode=10.73.20.11@tcp ost11/ost11
-                              mkfs.lustre --failover 10.73.20.21@tcp --ost --backfstype=zfs --fsname=zfsmo --index=12 --mgsnode=10.73.20.11@tcp ost12/ost12
-                              mkfs.lustre --failover 10.73.20.21@tcp --ost --backfstype=zfs --fsname=zfsmo --index=13 --mgsnode=10.73.20.11@tcp ost13/ost13
-                              mkfs.lustre --failover 10.73.20.21@tcp --ost --backfstype=zfs --fsname=zfsmo --index=14 --mgsnode=10.73.20.11@tcp ost14/ost14
-                              mkfs.lustre --failover 10.73.20.21@tcp --ost --backfstype=zfs --fsname=zfsmo --index=15 --mgsnode=10.73.20.11@tcp ost15/ost15
-                              mkfs.lustre --failover 10.73.20.21@tcp --ost --backfstype=zfs --fsname=zfsmo --index=16 --mgsnode=10.73.20.11@tcp ost16/ost16
-                              mkfs.lustre --failover 10.73.20.21@tcp --ost --backfstype=zfs --fsname=zfsmo --index=17 --mgsnode=10.73.20.11@tcp ost17/ost17
-                              mkfs.lustre --failover 10.73.20.21@tcp --ost --backfstype=zfs --fsname=zfsmo --index=18 --mgsnode=10.73.20.11@tcp ost18/ost18
-                              mkfs.lustre --failover 10.73.20.21@tcp --ost --backfstype=zfs --fsname=zfsmo --index=19 --mgsnode=10.73.20.11@tcp ost19/ost19
+                              mkfs.lustre --failover 10.73.20.21@tcp --ost --backfstype=zfs --fsname=zfsmo --index=10 --mgsnode=10.73.20.11@tcp:10.73.20.12@tcp ost10/ost10
+                              mkfs.lustre --failover 10.73.20.21@tcp --ost --backfstype=zfs --fsname=zfsmo --index=11 --mgsnode=10.73.20.11@tcp:10.73.20.12@tcp ost11/ost11
+                              mkfs.lustre --failover 10.73.20.21@tcp --ost --backfstype=zfs --fsname=zfsmo --index=12 --mgsnode=10.73.20.11@tcp:10.73.20.12@tcp ost12/ost12
+                              mkfs.lustre --failover 10.73.20.21@tcp --ost --backfstype=zfs --fsname=zfsmo --index=13 --mgsnode=10.73.20.11@tcp:10.73.20.12@tcp ost13/ost13
+                              mkfs.lustre --failover 10.73.20.21@tcp --ost --backfstype=zfs --fsname=zfsmo --index=14 --mgsnode=10.73.20.11@tcp:10.73.20.12@tcp ost14/ost14
+                              mkfs.lustre --failover 10.73.20.21@tcp --ost --backfstype=zfs --fsname=zfsmo --index=15 --mgsnode=10.73.20.11@tcp:10.73.20.12@tcp ost15/ost15
+                              mkfs.lustre --failover 10.73.20.21@tcp --ost --backfstype=zfs --fsname=zfsmo --index=16 --mgsnode=10.73.20.11@tcp:10.73.20.12@tcp ost16/ost16
+                              mkfs.lustre --failover 10.73.20.21@tcp --ost --backfstype=zfs --fsname=zfsmo --index=17 --mgsnode=10.73.20.11@tcp:10.73.20.12@tcp ost17/ost17
+                              mkfs.lustre --failover 10.73.20.21@tcp --ost --backfstype=zfs --fsname=zfsmo --index=18 --mgsnode=10.73.20.11@tcp:10.73.20.12@tcp ost18/ost18
+                              mkfs.lustre --failover 10.73.20.21@tcp --ost --backfstype=zfs --fsname=zfsmo --index=19 --mgsnode=10.73.20.11@tcp:10.73.20.12@tcp ost19/ost19
                               mkdir -p /lustre/zfsmo/ost{10..19}
                               mount -t lustre ost10/ost10 /lustre/zfsmo/ost10
                               mount -t lustre ost11/ost11 /lustre/zfsmo/ost11
@@ -601,7 +701,37 @@ Vagrant.configure('2') do |config|
                              mount -t lustre /dev/mapper/mpaths /mnt/ost2-8
                              mount -t lustre /dev/mapper/mpatht /mnt/ost2-9
                          SHELL
+
+        oss.vm.provision 'create-ldiskfs-lvm-fs',
+                         type: 'shell',
+                         run: 'never',
+                         path: 'scripts/create_ldiskfs_fs_osts.sh',
+                         args: ['k', 'o', 5, 'fs']
+
+        oss.vm.provision 'mount-ldiskfs-lvm-fs',
+                         type: 'shell',
+                         run: 'never',
+                         inline: <<-SHELL
+                             mkdir -p /mnt/ost{5,6,7,8,9}
+                             mount -t lustre /dev/mapper/mpathk /mnt/ost5
+                             mount -t lustre /dev/mapper/mpathl /mnt/ost6
+                             mount -t lustre /dev/mapper/mpathm /mnt/ost7
+                             mount -t lustre /dev/mapper/mpathn /mnt/ost8
+                             mount -t lustre /dev/mapper/mpatho /mnt/ost9
+                         SHELL
+
       end
+
+      oss.vm.provision 'ha-ldiskfs-lvm-fs-prep',
+                       type: 'shell',
+                       run: 'never',
+                       inline: <<-SHELL
+                         yum -y --nogpgcheck install pcs lustre-resource-agents
+                         echo -n lustre | passwd --stdin hacluster
+                         systemctl enable --now pcsd
+                         mkdir -p /mnt/ost{0..9}
+                       SHELL
+
     end
   end
 
@@ -630,7 +760,7 @@ Vagrant.configure('2') do |config|
                      type: 'shell',
                      run: 'never',
                      inline: <<-SHELL
-                            yum-config-manager --add-repo https://downloads.whamcloud.com/public/lustre/lustre-2.12.3/el7/client/
+                            yum-config-manager --add-repo https://downloads.whamcloud.com/public/lustre/lustre-#{LUSTRE}/el7/client/
                             yum install -y --nogpgcheck lustre-client
                      SHELL
     end
@@ -751,7 +881,8 @@ def install_ldiskfs_no_iml(config)
                       type: 'shell',
                       run: 'never',
                       reboot: true,
-                      path: './scripts/install_ldiskfs_no_iml.sh'
+                      path: './scripts/install_ldiskfs_no_iml.sh',
+                      args: "#{LUSTRE}"
 end
 
 def install_zfs_no_iml(config)
@@ -759,7 +890,8 @@ def install_zfs_no_iml(config)
                       type: 'shell',
                       run: 'never',
                       reboot: true,
-                      path: './scripts/install_zfs_no_iml.sh'
+                      path: './scripts/install_zfs_no_iml.sh',
+                      args: "#{LUSTRE}"
 end
 
 def use_vault_7_6_1810(config)

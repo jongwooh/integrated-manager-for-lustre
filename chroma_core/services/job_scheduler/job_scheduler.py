@@ -1911,7 +1911,9 @@ class JobScheduler(object):
             }
         )
 
-        client_host = ManagedHost.objects.get(server_profile_id="stratagem_client")
+        client_host = ManagedHost.objects.get(
+            Q(server_profile_id="stratagem_client") | Q(server_profile_id="stratagem_existing_client")
+        )
         client_mount_exists = LustreClientMount.objects.filter(host_id=client_host.id, filesystem_id=fs_id).exists()
 
         mountpoint = "/mnt/{}".format(filesystem.name)

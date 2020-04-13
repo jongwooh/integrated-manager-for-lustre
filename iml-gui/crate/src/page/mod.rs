@@ -73,6 +73,7 @@ pub(crate) enum Page {
     Users,
     User(user::Model),
     Volumes(volumes::Model),
+    ServerVolumes(volumes::Model),
     Volume(volume::Model),
     Devices(devices::Model),
     Device(device::Model),
@@ -103,8 +104,9 @@ impl Page {
             Self::Targets => "Targets".into(),
             Self::Target(m) => format!("Target: {}", &m.target.name),
             Self::Users => "Users".into(),
-            Self::User(m) => format!("User: {}", &m.user.username),
+            Self::User(m) => format!("User: {}", m.title()),
             Self::Volumes(_) => "Volumes".into(),
+            Self::ServerVolumes(m) => format!("Volumes on {}", &m.host.as_ref().unwrap().fqdn),
             Self::Volume(m) => format!("Volume: {}", &m.id),
             Self::Devices(_) => "Devices".into(),
             Self::Device(m) => format!("Device: {}", &m.device.device.id.0),
@@ -116,18 +118,23 @@ impl Page {
 
 impl RecordChange<Msg> for Page {
     fn update_record(&mut self, record: ArcRecord, cache: &ArcCache, orders: &mut impl Orders<Msg, GMsg>) {
-        if let Self::Volumes(x) = self {
-            x.update_record(record, cache, &mut orders.proxy(Msg::Volumes));
+        match self {
+            Self::Volumes(m) | Self::ServerVolumes(m) => {
+                m.update_record(record, cache, &mut orders.proxy(Msg::Volumes))
+            }
+            _ => {}
         }
     }
     fn remove_record(&mut self, id: RecordId, cache: &ArcCache, orders: &mut impl Orders<Msg, GMsg>) {
-        if let Self::Volumes(x) = self {
-            x.remove_record(id, cache, &mut orders.proxy(Msg::Volumes));
+        match self {
+            Self::Volumes(m) | Self::ServerVolumes(m) => m.remove_record(id, cache, &mut orders.proxy(Msg::Volumes)),
+            _ => {}
         }
     }
     fn set_records(&mut self, cache: &ArcCache, orders: &mut impl Orders<Msg, GMsg>) {
-        if let Self::Volumes(x) = self {
-            x.set_records(cache, &mut orders.proxy(Msg::Volumes));
+        match self {
+            Self::Volumes(m) | Self::ServerVolumes(m) => m.set_records(cache, &mut orders.proxy(Msg::Volumes)),
+            _ => {}
         }
     }
 }
@@ -199,6 +206,12 @@ impl<'a> From<(&ArcCache, &Route<'a>)> for Page {
                 .ok()
                 .and_then(|x| cache.user.get(&x))
                 .map(|x| Self::User(user::Model::new(Arc::clone(x))))
+                .unwrap_or_default(),
+            Route::ServerVolumes(id) => id
+                .parse()
+                .ok()
+                .and_then(|x| cache.host.get(&x))
+                .map(|h| Self::ServerVolumes(volumes::Model::from(h)))
                 .unwrap_or_default(),
             Route::Volumes => Self::Volumes(volumes::Model::default()),
             Route::Volume(id) => id
@@ -282,8 +295,8 @@ impl Page {
             Self::Dashboard(_) => {
                 dashboard::init(&mut orders.proxy(Msg::Dashboard));
             }
-            Self::Volumes(x) => {
-                volumes::init(cache, x, &mut orders.proxy(Msg::Volumes));
+            Self::Volumes(m) | Self::ServerVolumes(m) => {
+                volumes::init(cache, m, &mut orders.proxy(Msg::Volumes));
             }
             Self::Devices(_) => devices::init(cache, &mut orders.proxy(Msg::Devices)),
             Self::DeviceHosts(_) => device_hosts::init(cache, &mut orders.proxy(Msg::DeviceHosts)),
@@ -373,11 +386,10 @@ pub(crate) fn update(msg: Msg, page: &mut Page, cache: &ArcCache, orders: &mut i
                 user::update(msg, page, &mut orders.proxy(Msg::User));
             }
         }
-        Msg::Volumes(msg) => {
-            if let Page::Volumes(page) = page {
-                volumes::update(msg, page, &mut orders.proxy(Msg::Volumes))
-            }
-        }
+        Msg::Volumes(msg) => match page {
+            Page::Volumes(m) | Page::ServerVolumes(m) => volumes::update(msg, m, &mut orders.proxy(Msg::Volumes)),
+            _ => {}
+        },
         Msg::Login(msg) => {
             if let Page::Login(page) = page {
                 login::update(*msg, page, &mut orders.proxy(|x| Msg::Login(Box::new(x))));
