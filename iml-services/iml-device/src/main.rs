@@ -2,9 +2,10 @@
 // Use of this source code is governed by a MIT-style
 // license that can be found in the LICENSE file.
 
-use device_types::devices::Device;
+use device_types::{devices::Device, mount::Mount};
 use futures::{lock::Mutex, TryFutureExt, TryStreamExt};
 use iml_device::{
+    bubbleup::bubbleup_mount,
     linux_plugin_transforms::{
         build_device_lookup, devtree2linuxoutput, get_shared_pools, populate_zpool, update_vgs,
         LinuxPluginData,
@@ -86,9 +87,12 @@ async fn main() -> Result<(), ImlDeviceError> {
     tokio::spawn(server);
 
     let mut s = consume_data("rust_agent_device_rx");
+    let pool = iml_orm::pool()?;
 
     while let Some((fqdn, device)) = s.try_next().await? {
         let mut cache = cache2.lock().await;
+
+        bubbleup_mount(&pool, &fqdn, &device).await?;
 
         cache.insert(fqdn, device);
     }

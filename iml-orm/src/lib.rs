@@ -16,7 +16,16 @@ pub mod schema;
 pub mod alerts;
 
 #[cfg(feature = "postgres-interop")]
+pub mod django;
+
+#[cfg(feature = "postgres-interop")]
 pub mod hosts;
+
+#[cfg(feature = "postgres-interop")]
+pub mod targets;
+
+#[cfg(feature = "postgres-interop")]
+pub mod volumenode;
 
 #[cfg(feature = "postgres-interop")]
 use diesel::{

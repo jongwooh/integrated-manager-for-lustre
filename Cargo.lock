@@ -1282,12 +1282,15 @@ name = "iml-device"
 version = "0.2.0"
 dependencies = [
  "device-types",
+ "diesel",
  "futures",
  "iml-manager-env",
+ "iml-orm",
  "iml-rabbit",
  "iml-service-queue",
  "iml-wire-types",
  "insta",
+ "r2d2",
  "serde",
  "serde_json",
  "thiserror",
