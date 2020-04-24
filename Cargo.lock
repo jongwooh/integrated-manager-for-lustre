@@ -1285,6 +1285,7 @@ dependencies = [
  "iml-wire-types",
  "insta",
  "jsondata",
+ "lazy_static",
  "serde",
  "serde_json",
  "thiserror",

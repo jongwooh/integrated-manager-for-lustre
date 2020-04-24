@@ -291,14 +291,31 @@ fn insert_virtual_devices(d: &mut Device, parents: &[Device]) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use im::{hashmap, HashMap};
     use insta::assert_json_snapshot;
     use jsondata;
     use std::fs;
 
+    lazy_static::lazy_static! {
+        static ref TEST_DATA: HashMap<String, ((String, String), (Fqdn, Fqdn))>
+            = hashmap!{
+                "simple_test".into() => (
+                    (
+                        "fixtures/device-mds1.local-2034-pruned.json".into(),
+                        "fixtures/device-mds2.local-2033-pruned.json".into(),
+                    ),
+                    (
+                        Fqdn("mds1.local".into()),
+                        Fqdn("mds2.local".into()),
+                    )
+                )
+            };
+    }
+
     #[tokio::test]
     async fn simple_test() {
-        let path1 = "fixtures/device-mds1.local-2034-pruned.json";
-        let path2 = "fixtures/device-mds2.local-2033-pruned.json";
+        let path1 = &(TEST_DATA["simple_test"].0).0;
+        let path2 = &(TEST_DATA["simple_test"].0).1;
 
         let device1 = fs::read_to_string(path1).unwrap();
         let device1: Device = serde_json::from_str(&device1).unwrap();
@@ -307,8 +324,8 @@ mod tests {
         let device2: Device = serde_json::from_str(&device2).unwrap();
 
         let devices = vec![
-            (Fqdn("mds1.local".into()), device1),
-            (Fqdn("mds2.local".into()), device2),
+            (((TEST_DATA["simple_test"].1).0).clone(), device1),
+            (((TEST_DATA["simple_test"].1).1).clone(), device2),
         ];
 
         let results = update_virtual_devices(devices).await;
