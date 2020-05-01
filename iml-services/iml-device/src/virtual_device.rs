@@ -6,7 +6,7 @@ use device_types::devices::{
     Device, LogicalVolume, MdRaid, Mpath, Partition, Root, ScsiDevice, VolumeGroup, Zpool,
 };
 use diesel::{self, pg::upsert::excluded, prelude::*};
-use im::{HashSet, OrdSet, Vector};
+use im::{OrdSet, Vector};
 
 use iml_orm::{
     models::{ChromaCoreDevice, NewChromaCoreDevice},
@@ -16,7 +16,7 @@ use iml_orm::{
 };
 
 use iml_wire_types::Fqdn;
-use std::{collections, mem, path::PathBuf};
+use std::{collections, path::PathBuf};
 
 pub async fn save_devices(devices: Vec<(Fqdn, Device)>, pool: &DbPool) {
     for (f, d) in devices.into_iter() {
