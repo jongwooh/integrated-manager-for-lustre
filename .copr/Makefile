@@ -34,7 +34,10 @@ substs: $(SUBSTS)
 	chmod +x $(SUBSTS_SHELL)
 
 srpm:
-	yum install -y postgresql96-devel
+	if ! rpm -q postgresql96-devel 2> /dev/null; then \
+		yum install -y postgresql96-devel; \
+	fi
+
 	mkdir -p ${TMPDIR}/_topdir/{SOURCES,SPECS}
 	mkdir -p ${TMPDIR}/release/rust-iml
 	PQ_LIB_DIR=/usr/pgsql-9.6/lib cargo build --release
@@ -93,6 +96,7 @@ iml-srpm: iml-deps substs
 	cp -r ${BUILDROOT}/grafana ${TMPDIR}/configuration
 	cp ${BUILDROOT}/iml-*.service \
 		${BUILDROOT}/rabbitmq-env.conf \
+		${BUILDROOT}/rabbitmq-server-dropin.conf \
 		${BUILDROOT}/iml-manager-redirect.conf \
 		${BUILDROOT}/iml-manager.target \
 		${BUILDROOT}/chroma-config.1 \
