@@ -137,6 +137,7 @@ impl DaemonPlugin for Devices {
                     new.as_ref().map(|new| {
                         let mut d = my::Recorder::default();
                         diff(old, new, &mut d);
+                        let serialized_recorder = serde_json::to_value(&d).unwrap();
                     })
                 });
 
@@ -155,23 +156,24 @@ impl DaemonPlugin for Devices {
 }
 
 mod my {
+    use serde::{Deserialize, Serialize};
     use treediff::Delegate;
 
-    #[derive(Debug, PartialEq)]
-    pub enum ChangeType<'a, K, V: 'a> {
-        Removed(Vec<K>, &'a V),
-        Added(Vec<K>, &'a V),
-        Unchanged(Vec<K>, &'a V),
-        Modified(Vec<K>, &'a V, &'a V),
+    #[derive(Debug, PartialEq, Deserialize, Serialize)]
+    pub enum ChangeType<K, V> {
+        Removed(Vec<K>, V),
+        Added(Vec<K>, V),
+        Unchanged(Vec<K>, V),
+        Modified(Vec<K>, V, V),
     }
 
-    #[derive(Debug, PartialEq)]
-    pub struct Recorder<'a, K, V: 'a> {
+    #[derive(Debug, PartialEq, Deserialize, Serialize)]
+    pub struct Recorder<K, V> {
         cursor: Vec<K>,
-        pub calls: Vec<ChangeType<'a, K, V>>,
+        pub calls: Vec<ChangeType<K, V>>,
     }
 
-    impl<'a, K, V> Default for Recorder<'a, K, V> {
+    impl<K, V> Default for Recorder<K, V> {
         fn default() -> Self {
             Recorder {
                 cursor: Vec::new(),
@@ -194,9 +196,10 @@ mod my {
         }
     }
 
-    impl<'a, K, V> Delegate<'a, K, V> for Recorder<'a, K, V>
+    impl<'a, K, V> Delegate<'a, K, V> for Recorder<K, V>
     where
         K: Clone,
+        V: Clone,
     {
         fn push(&mut self, k: &K) {
             self.cursor.push(k.clone())
@@ -206,19 +209,22 @@ mod my {
         }
         fn removed<'b>(&mut self, k: &'b K, v: &'a V) {
             self.calls
-                .push(ChangeType::Removed(mk(&self.cursor, Some(k)), v));
+                .push(ChangeType::Removed(mk(&self.cursor, Some(k)), v.clone()));
         }
         fn added<'b>(&mut self, k: &'b K, v: &'a V) {
             self.calls
-                .push(ChangeType::Added(mk(&self.cursor, Some(k)), v));
+                .push(ChangeType::Added(mk(&self.cursor, Some(k)), v.clone()));
         }
         fn unchanged<'b>(&mut self, v: &'a V) {
             self.calls
-                .push(ChangeType::Unchanged(self.cursor.clone(), v));
+                .push(ChangeType::Unchanged(self.cursor.clone(), v.clone()));
         }
         fn modified<'b>(&mut self, v1: &'a V, v2: &'a V) {
-            self.calls
-                .push(ChangeType::Modified(mk(&self.cursor, None), v1, v2));
+            self.calls.push(ChangeType::Modified(
+                mk(&self.cursor, None),
+                v1.clone(),
+                v2.clone(),
+            ));
         }
     }
 }
