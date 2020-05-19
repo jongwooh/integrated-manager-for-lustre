@@ -1235,6 +1235,7 @@ dependencies = [
  "tokio",
  "tokio-util",
  "tracing",
+ "treediff",
  "url",
  "uuid",
  "v_hist",
@@ -3700,6 +3701,15 @@ dependencies = [
  "tracing-core",
  "tracing-log",
  "tracing-serde",
+]
+
+[[package]]
+name = "treediff"
+version = "4.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9975655adeb6c47931d6bcd4173a493a1feb510a549f9e5f41f6f1f9fc24836f"
+dependencies = [
+ "serde_json",
 ]
 
 [[package]]

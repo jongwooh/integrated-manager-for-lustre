@@ -14,6 +14,7 @@ use std::{io, pin::Pin, sync::Arc};
 use stream_cancel::{Trigger, Tripwire};
 use tokio::{io::AsyncWriteExt, net::UnixStream};
 use tokio_util::codec::{FramedRead, LinesCodec};
+use treediff::diff;
 
 /// Opens a persistent stream to device scanner.
 fn device_stream() -> impl Stream<Item = Result<String, ImlAgentError>> {
@@ -39,14 +40,19 @@ enum State {
 pub fn create() -> impl DaemonPlugin {
     Devices {
         trigger: None,
-        state: Arc::new(Mutex::new((None, State::Sent))),
+        state: Arc::new(Mutex::new((None, None, State::Sent))),
     }
+}
+
+pub enum Update {
+    Initial(Output),
+    Patch(()),
 }
 
 #[derive(Debug)]
 pub struct Devices {
     trigger: Option<Trigger>,
-    state: Arc<Mutex<(Output, State)>>,
+    state: Arc<Mutex<(Output, Output, State)>>,
 }
 
 #[async_trait]
@@ -81,7 +87,7 @@ impl DaemonPlugin for Devices {
             {
                 let mut lock = state.lock().await;
 
-                lock.0 = x.clone();
+                lock.1 = x.clone();
             }
 
             tokio::spawn(
@@ -92,11 +98,11 @@ impl DaemonPlugin for Devices {
                         async move {
                             let mut lock = state.lock().await;
 
-                            if lock.0 != x {
+                            if lock.1 != x {
                                 tracing::debug!("marking pending (is none: {}) ", x.is_none());
 
-                                lock.0 = x;
-                                lock.1 = State::Pending;
+                                lock.1 = x;
+                                lock.2 = State::Pending;
                             }
 
                             Ok(())
@@ -120,11 +126,21 @@ impl DaemonPlugin for Devices {
         async move {
             let mut lock = state.lock().await;
 
-            if lock.1 == State::Pending {
+            if lock.2 == State::Pending {
                 tracing::debug!("Sending new value");
-                lock.1 = State::Sent;
+                lock.2 = State::Sent;
 
-                Ok(lock.0.clone())
+                let old = &lock.0;
+                let new = &lock.1;
+
+                old.as_ref().map(|old| {
+                    new.as_ref().map(|new| {
+                        let mut d = my::Recorder::default();
+                        diff(old, new, &mut d);
+                    })
+                });
+
+                Ok(lock.1.clone())
             } else {
                 Ok(None)
             }
@@ -135,5 +151,74 @@ impl DaemonPlugin for Devices {
         self.trigger.take();
 
         Ok(())
+    }
+}
+
+mod my {
+    use treediff::Delegate;
+
+    #[derive(Debug, PartialEq)]
+    pub enum ChangeType<'a, K, V: 'a> {
+        Removed(Vec<K>, &'a V),
+        Added(Vec<K>, &'a V),
+        Unchanged(Vec<K>, &'a V),
+        Modified(Vec<K>, &'a V, &'a V),
+    }
+
+    #[derive(Debug, PartialEq)]
+    pub struct Recorder<'a, K, V: 'a> {
+        cursor: Vec<K>,
+        pub calls: Vec<ChangeType<'a, K, V>>,
+    }
+
+    impl<'a, K, V> Default for Recorder<'a, K, V> {
+        fn default() -> Self {
+            Recorder {
+                cursor: Vec::new(),
+                calls: Vec::new(),
+            }
+        }
+    }
+
+    fn mk<K>(c: &[K], k: Option<&K>) -> Vec<K>
+    where
+        K: Clone,
+    {
+        let mut c = Vec::from(c);
+        match k {
+            Some(k) => {
+                c.push(k.clone());
+                c
+            }
+            None => c,
+        }
+    }
+
+    impl<'a, K, V> Delegate<'a, K, V> for Recorder<'a, K, V>
+    where
+        K: Clone,
+    {
+        fn push(&mut self, k: &K) {
+            self.cursor.push(k.clone())
+        }
+        fn pop(&mut self) {
+            self.cursor.pop();
+        }
+        fn removed<'b>(&mut self, k: &'b K, v: &'a V) {
+            self.calls
+                .push(ChangeType::Removed(mk(&self.cursor, Some(k)), v));
+        }
+        fn added<'b>(&mut self, k: &'b K, v: &'a V) {
+            self.calls
+                .push(ChangeType::Added(mk(&self.cursor, Some(k)), v));
+        }
+        fn unchanged<'b>(&mut self, v: &'a V) {
+            self.calls
+                .push(ChangeType::Unchanged(self.cursor.clone(), v));
+        }
+        fn modified<'b>(&mut self, v1: &'a V, v2: &'a V) {
+            self.calls
+                .push(ChangeType::Modified(mk(&self.cursor, None), v1, v2));
+        }
     }
 }
