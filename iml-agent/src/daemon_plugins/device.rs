@@ -133,15 +133,18 @@ impl DaemonPlugin for Devices {
                 let old = &lock.0;
                 let new = &lock.1;
 
-                old.as_ref().map(|old| {
-                    new.as_ref().map(|new| {
-                        let mut d = my::Recorder::default();
-                        diff(old, new, &mut d);
-                        let serialized_recorder = serde_json::to_value(&d).unwrap();
+                let serialized_recorder = old
+                    .as_ref()
+                    .map(|old| {
+                        new.as_ref().map(|new| {
+                            let mut d: treediff::tools::owning_recorder::Recorder<treediff::value::Key, serde_json::Value> = treediff::tools::owning_recorder::Recorder::default();
+                            diff(old, new, &mut d);
+                            serde_json::to_value(&d).unwrap()
+                        })
                     })
-                });
+                    .flatten();
 
-                Ok(lock.1.clone())
+                Ok(serialized_recorder)
             } else {
                 Ok(None)
             }
@@ -152,79 +155,5 @@ impl DaemonPlugin for Devices {
         self.trigger.take();
 
         Ok(())
-    }
-}
-
-mod my {
-    use serde::{Deserialize, Serialize};
-    use treediff::Delegate;
-
-    #[derive(Debug, PartialEq, Deserialize, Serialize)]
-    pub enum ChangeType<K, V> {
-        Removed(Vec<K>, V),
-        Added(Vec<K>, V),
-        Unchanged(Vec<K>, V),
-        Modified(Vec<K>, V, V),
-    }
-
-    #[derive(Debug, PartialEq, Deserialize, Serialize)]
-    pub struct Recorder<K, V> {
-        cursor: Vec<K>,
-        pub calls: Vec<ChangeType<K, V>>,
-    }
-
-    impl<K, V> Default for Recorder<K, V> {
-        fn default() -> Self {
-            Recorder {
-                cursor: Vec::new(),
-                calls: Vec::new(),
-            }
-        }
-    }
-
-    fn mk<K>(c: &[K], k: Option<&K>) -> Vec<K>
-    where
-        K: Clone,
-    {
-        let mut c = Vec::from(c);
-        match k {
-            Some(k) => {
-                c.push(k.clone());
-                c
-            }
-            None => c,
-        }
-    }
-
-    impl<'a, K, V> Delegate<'a, K, V> for Recorder<K, V>
-    where
-        K: Clone,
-        V: Clone,
-    {
-        fn push(&mut self, k: &K) {
-            self.cursor.push(k.clone())
-        }
-        fn pop(&mut self) {
-            self.cursor.pop();
-        }
-        fn removed<'b>(&mut self, k: &'b K, v: &'a V) {
-            self.calls
-                .push(ChangeType::Removed(mk(&self.cursor, Some(k)), v.clone()));
-        }
-        fn added<'b>(&mut self, k: &'b K, v: &'a V) {
-            self.calls
-                .push(ChangeType::Added(mk(&self.cursor, Some(k)), v.clone()));
-        }
-        fn unchanged<'b>(&mut self, v: &'a V) {
-            self.calls
-                .push(ChangeType::Unchanged(self.cursor.clone(), v.clone()));
-        }
-        fn modified<'b>(&mut self, v1: &'a V, v2: &'a V) {
-            self.calls.push(ChangeType::Modified(
-                mk(&self.cursor, None),
-                v1.clone(),
-                v2.clone(),
-            ));
-        }
     }
 }

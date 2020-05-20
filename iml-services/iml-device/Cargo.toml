@@ -20,6 +20,7 @@ serde_json = "1.0"
 thiserror = "1.0"
 tokio = { version = "0.2", features = ["macros"] }
 tokio-util = { version = "0.3", features = ["codec"] }
+treediff = { git = "https://github.com/whamcloud/treediff-rs.git", branch = "key-serde", version = "4.0.0", features = ["with-serde-json"] }
 tracing = "0.1"
 warp = "0.2"
 

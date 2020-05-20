@@ -1317,6 +1317,7 @@ dependencies = [
  "tokio",
  "tokio-util",
  "tracing",
+ "treediff",
  "warp",
 ]
 
@@ -3706,7 +3707,7 @@ dependencies = [
 [[package]]
 name = "treediff"
 version = "4.0.0"
-source = "git+https://github.com/whamcloud/treediff-rs.git?branch=key-serde#dc1004882768df065815561a74869bc16de0e020"
+source = "git+https://github.com/whamcloud/treediff-rs.git?branch=key-serde#b1cd4738fcb0a94504515ab2bbf70f0378f8dbfb"
 dependencies = [
  "serde",
  "serde_json",
