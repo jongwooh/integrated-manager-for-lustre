@@ -47,7 +47,7 @@ url = "2.1"
 uuid = { version = "0.8", features = ["v4"] }
 v_hist = "0.1.2"
 version-utils = { path = "../version-utils", version = "0.1.0" }
-treediff = { version = "4.0.0", features = ["with-serde-json"] }
+treediff = { git = "https://github.com/whamcloud/treediff-rs.git", branch = "key-serde", version = "4.0.0", features = ["with-serde-json"] }
 
 [dependencies.regex]
 version = "1.3"

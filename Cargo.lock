@@ -3706,9 +3706,9 @@ dependencies = [
 [[package]]
 name = "treediff"
 version = "4.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9975655adeb6c47931d6bcd4173a493a1feb510a549f9e5f41f6f1f9fc24836f"
+source = "git+https://github.com/whamcloud/treediff-rs.git?branch=key-serde#dc1004882768df065815561a74869bc16de0e020"
 dependencies = [
+ "serde",
  "serde_json",
 ]
 
