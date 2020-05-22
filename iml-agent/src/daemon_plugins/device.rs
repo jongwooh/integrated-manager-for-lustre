@@ -115,7 +115,21 @@ impl DaemonPlugin for Devices {
                     }),
             );
 
-            Ok(x)
+            let old = serde_json::from_str("{}").unwrap();
+            let new = x;
+
+            let serialized_recorder = new.as_ref().map(|new| {
+                let mut d: treediff::tools::owning_recorder::Recorder<
+                    treediff::value::Key,
+                    serde_json::Value,
+                > = treediff::tools::owning_recorder::Recorder::default();
+                diff(&old, new, &mut d);
+                serde_json::to_value(&d).unwrap()
+            });
+
+            tracing::info!("Serialized: {:?}", serialized_recorder);
+
+            Ok(serialized_recorder)
         })
     }
     fn update_session(
@@ -137,12 +151,17 @@ impl DaemonPlugin for Devices {
                     .as_ref()
                     .map(|old| {
                         new.as_ref().map(|new| {
-                            let mut d: treediff::tools::owning_recorder::Recorder<treediff::value::Key, serde_json::Value> = treediff::tools::owning_recorder::Recorder::default();
+                            let mut d: treediff::tools::owning_recorder::Recorder<
+                                treediff::value::Key,
+                                serde_json::Value,
+                            > = treediff::tools::owning_recorder::Recorder::default();
                             diff(old, new, &mut d);
                             serde_json::to_value(&d).unwrap()
                         })
                     })
                     .flatten();
+
+                tracing::info!("Serialized: {:?}", serialized_recorder);
 
                 Ok(serialized_recorder)
             } else {

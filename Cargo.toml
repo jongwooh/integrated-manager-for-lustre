@@ -44,3 +44,6 @@ exclude = [
     'iml-system-rpm-tests',
     'iml-system-docker-tests',
 ]
+
+# [patch.'https://github.com/whamcloud/treediff-rs.git']
+# treediff = { path = "../treediff-rs" }
