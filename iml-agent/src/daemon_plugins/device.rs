@@ -127,8 +127,6 @@ impl DaemonPlugin for Devices {
                 serde_json::to_value(&d).unwrap()
             });
 
-            tracing::info!("Serialized: {:?}", serialized_recorder);
-
             Ok(serialized_recorder)
         })
     }
@@ -161,7 +159,7 @@ impl DaemonPlugin for Devices {
                     })
                     .flatten();
 
-                tracing::info!("Serialized: {:?}", serialized_recorder);
+                lock.0 = lock.1.clone();
 
                 Ok(serialized_recorder)
             } else {
