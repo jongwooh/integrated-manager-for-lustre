@@ -115,14 +115,16 @@ impl DaemonPlugin for Devices {
                     }),
             );
 
-            let old = serde_json::from_str("{}").unwrap();
+            let old: serde_json::Value = serde_json::from_str("{}").unwrap();
             let new = x;
 
             let serialized_recorder = new.as_ref().map(|new| {
-                let mut d: treediff::tools::owning_recorder::Recorder<
+                let mut d: treediff::tools::Merger<
                     treediff::value::Key,
-                    serde_json::Value,
-                > = treediff::tools::owning_recorder::Recorder::default();
+                    serde_json::value::Value,
+                    treediff::tools::DefaultMutableFilter,
+                    treediff::tools::DefaultMutableFilter,
+                > = treediff::tools::Merger::from(old.clone());
                 diff(&old, new, &mut d);
                 serde_json::to_value(&d).unwrap()
             });

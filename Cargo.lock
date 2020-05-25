@@ -3707,7 +3707,7 @@ dependencies = [
 [[package]]
 name = "treediff"
 version = "4.0.0"
-source = "git+https://github.com/whamcloud/treediff-rs.git?branch=key-serde#b1cd4738fcb0a94504515ab2bbf70f0378f8dbfb"
+source = "git+https://github.com/whamcloud/treediff-rs.git?branch=key-serde#7b32fe6694b1e5e0c29be8379752e62f43075e9f"
 dependencies = [
  "serde",
  "serde_json",
