@@ -109,14 +109,22 @@ async fn main() -> Result<(), ImlDeviceError> {
     let mut s = consume_data::<Device>("rust_agent_device_rx");
 
     while let Some((f, d)) = s.try_next().await? {
+        use chrono::prelude::*;
+
+        let begin: DateTime<Local> = Local::now();
+
         let mut cache = cache2.lock().await;
 
         cache.insert(f.clone(), d.clone());
+
+        let middle1: DateTime<Local> = Local::now();
 
         let device_to_insert = NewChromaCoreDevice {
             fqdn: f.to_string(),
             devices: serde_json::to_value(d).expect("Could not convert incoming Devices to JSON."),
         };
+
+        let middle2: DateTime<Local> = Local::now();
 
         let new_device = diesel::insert_into(table)
             .values(device_to_insert)
@@ -127,7 +135,14 @@ async fn main() -> Result<(), ImlDeviceError> {
             .await
             .expect("Error saving new device");
 
-        tracing::info!("Inserted device from host {}", new_device.fqdn);
+        let end: DateTime<Local> = Local::now();
+
+        tracing::info!(
+            "Inserted device from host {}, duration: {:3} ms, duration of resolution: {:3} ms",
+            new_device.fqdn,
+            (end - begin).num_milliseconds(),
+            (middle2 - middle1).num_milliseconds(),
+        );
         tracing::trace!("Inserted device {:?}", new_device);
     }
 
