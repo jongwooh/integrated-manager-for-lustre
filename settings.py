@@ -90,9 +90,11 @@ TIMER_PROXY_PASS = "http://{}:{}".format(PROXY_HOST, TIMER_PORT)
 
 INCLUDES = ""
 
-BRANDING = "Whamcloud"
+BRANDING = os.getenv("BRANDING", "Whamcloud")
 
-USE_STRATAGEM = False
+USE_STRATAGEM = os.getenv("USE_STRATAGEM", "false")
+
+SFA_ENDPOINTS = os.getenv("SFA_ENDPOINTS", "")
 
 ALLOWED_HOSTS = ["*"]
 
@@ -284,7 +286,7 @@ CRYPTO_FOLDER = "/var/lib/chroma"
 
 GUNICORN_PID_PATH = "/var/run/gunicorn.pid"
 
-LOG_LEVEL = logging.INFO
+LOG_LEVEL = int(os.getenv("LOG_LEVEL", logging.INFO))
 
 EMAIL_HOST = None
 EMAIL_SUBJECT_PREFIX = "[Chroma Server]"

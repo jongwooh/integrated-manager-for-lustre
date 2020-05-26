@@ -83,7 +83,14 @@ async fn main() -> Result<(), ImlDeviceError> {
 
     tokio::spawn(server);
 
-    let mut s = consume_data::<Device>("rust_agent_device_rx");
+    let mut s = consume_data::<
+        treediff::tools::Merger<
+            treediff::value::Key,
+            serde_json::value::Value,
+            treediff::tools::DefaultMutableFilter,
+            treediff::tools::DefaultMutableFilter,
+        >,
+    >("rust_agent_device_rx");
 
     let pool = iml_orm::pool().unwrap();
 
@@ -102,32 +109,34 @@ async fn main() -> Result<(), ImlDeviceError> {
     // In summary, you can observe up to a minute of incoming updates, with a period of roughly 10 seconds.
     // The period is usually a bit longer due to overhead. So a max of 5 updates has been observed in practice.
     //
-    while let Some((f, d)) = s.try_next().await? {
+    while let Some((f, diff)) = s.try_next().await? {
         let begin: DateTime<Local> = Local::now();
         tracing::info!("Iteration {}: begin: {}", i, begin);
 
-        let mut cache = cache2.lock().await;
-        cache.insert(f.clone(), d.clone());
+        // let mut cache = cache2.lock().await;
+        // cache.insert(f.clone(), d.clone());
 
-        assert!(
-            match d {
-                Device::Root(_) => true,
-                _ => false,
-            },
-            "The top device has to be Root"
-        );
+        tracing::info!("Difference: {:?}", diff);
 
-        let mut all_devices = get_other_devices(&f, &pool).await;
+        // assert!(
+        //     match d {
+        //         Device::Root(_) => true,
+        //         _ => false,
+        //     },
+        //     "The top device has to be Root"
+        // );
 
-        all_devices.push((f, d));
+        // let mut all_devices = get_other_devices(&f, &pool).await;
+
+        // all_devices.push((f, d));
 
         let middle1: DateTime<Local> = Local::now();
 
-        let updated_devices = update_virtual_devices(all_devices);
+        // let updated_devices = update_virtual_devices(all_devices);
 
         let middle2: DateTime<Local> = Local::now();
 
-        save_devices(updated_devices, &pool).await;
+        // save_devices(updated_devices, &pool).await;
 
         let end: DateTime<Local> = Local::now();
 

@@ -47,3 +47,5 @@ exclude = [
 
 [profile.release]
 debug = true
+# [patch.'https://github.com/whamcloud/treediff-rs.git']
+# treediff = { path = "../treediff-rs" }

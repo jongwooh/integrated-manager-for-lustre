@@ -96,6 +96,7 @@ pub fn data_only(message: PluginMessage) -> Option<(Fqdn, serde_json::Value)> {
 pub fn into_deserialized<T: serde::de::DeserializeOwned>(
     (fqdn, body): (Fqdn, serde_json::Value),
 ) -> Result<(Fqdn, T), ImlServiceQueueError> {
+    tracing::info!("Deserializing: {:?}", body);
     let v = serde_json::from_value(body)?;
 
     Ok((fqdn, v))

@@ -3,8 +3,11 @@
 // license that can be found in the LICENSE file.
 
 mod action;
+mod command;
 mod error;
+mod task;
 
+use iml_orm::create_pool_filter;
 use iml_rabbit::{self, create_connection_filter};
 use iml_wire_types::Conf;
 use warp::Filter;
@@ -24,13 +27,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         use_stratagem: iml_manager_env::get_use_stratagem(),
     };
 
-    let (fut, client_filter) = create_connection_filter().await?;
+    let (cli_fut, client_filter) = create_connection_filter().await?;
+    let (pool_fut, pool_filter) = create_pool_filter().await?;
 
-    tokio::spawn(fut);
+    tokio::spawn(cli_fut);
+    tokio::spawn(pool_fut);
 
     let routes = warp::path("conf")
         .map(move || warp::reply::json(&conf))
-        .or(action::endpoint(client_filter));
+        .or(action::endpoint(client_filter.clone()))
+        .or(task::endpoint(client_filter, pool_filter));
 
     tracing::info!("Starting on {:?}", addr);
 

@@ -11,9 +11,10 @@ use futures::{
     future, lock::Mutex, Future, FutureExt, Stream, StreamExt, TryFutureExt, TryStreamExt,
 };
 use std::{io, pin::Pin, sync::Arc};
-use stream_cancel::{StreamExt as _, Trigger, Tripwire};
+use stream_cancel::{Trigger, Tripwire};
 use tokio::{io::AsyncWriteExt, net::UnixStream};
 use tokio_util::codec::{FramedRead, LinesCodec};
+use treediff::diff;
 
 /// Opens a persistent stream to device scanner.
 fn device_stream() -> impl Stream<Item = Result<String, ImlAgentError>> {
@@ -39,14 +40,19 @@ enum State {
 pub fn create() -> impl DaemonPlugin {
     Devices {
         trigger: None,
-        state: Arc::new(Mutex::new((None, State::Sent))),
+        state: Arc::new(Mutex::new((None, None, State::Sent))),
     }
+}
+
+pub enum Update {
+    Initial(Output),
+    Patch(()),
 }
 
 #[derive(Debug)]
 pub struct Devices {
     trigger: Option<Trigger>,
-    state: Arc<Mutex<(Output, State)>>,
+    state: Arc<Mutex<(Output, Output, State)>>,
 }
 
 #[async_trait]
@@ -81,7 +87,7 @@ impl DaemonPlugin for Devices {
             {
                 let mut lock = state.lock().await;
 
-                lock.0 = x.clone();
+                lock.1 = x.clone();
             }
 
             tokio::spawn(
@@ -92,11 +98,11 @@ impl DaemonPlugin for Devices {
                         async move {
                             let mut lock = state.lock().await;
 
-                            if lock.0 != x {
+                            if lock.1 != x {
                                 tracing::debug!("marking pending (is none: {}) ", x.is_none());
 
-                                lock.0 = x;
-                                lock.1 = State::Pending;
+                                lock.1 = x;
+                                lock.2 = State::Pending;
                             }
 
                             Ok(())
@@ -109,7 +115,21 @@ impl DaemonPlugin for Devices {
                     }),
             );
 
-            Ok(x)
+            let old: serde_json::Value = serde_json::from_str("{}").unwrap();
+            let new = x;
+
+            let serialized_recorder = new.as_ref().map(|new| {
+                let mut d: treediff::tools::Merger<
+                    treediff::value::Key,
+                    serde_json::value::Value,
+                    treediff::tools::DefaultMutableFilter,
+                    treediff::tools::DefaultMutableFilter,
+                > = treediff::tools::Merger::from(old.clone());
+                diff(&old, new, &mut d);
+                serde_json::to_value(&d).unwrap()
+            });
+
+            Ok(serialized_recorder)
         })
     }
     fn update_session(
@@ -120,11 +140,30 @@ impl DaemonPlugin for Devices {
         async move {
             let mut lock = state.lock().await;
 
-            if lock.1 == State::Pending {
+            if lock.2 == State::Pending {
                 tracing::debug!("Sending new value");
-                lock.1 = State::Sent;
+                lock.2 = State::Sent;
 
-                Ok(lock.0.clone())
+                let old = &lock.0;
+                let new = &lock.1;
+
+                let serialized_recorder = old
+                    .as_ref()
+                    .map(|old| {
+                        new.as_ref().map(|new| {
+                            let mut d: treediff::tools::owning_recorder::Recorder<
+                                treediff::value::Key,
+                                serde_json::Value,
+                            > = treediff::tools::owning_recorder::Recorder::default();
+                            diff(old, new, &mut d);
+                            serde_json::to_value(&d).unwrap()
+                        })
+                    })
+                    .flatten();
+
+                lock.0 = lock.1.clone();
+
+                Ok(serialized_recorder)
             } else {
                 Ok(None)
             }

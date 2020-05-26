@@ -1,6 +1,6 @@
 set -x
 
-yum install -y mock-1.2.17 nosync.x86_64
+yum install -y mock-1.2.17 nosync
 
 set +e
 
@@ -92,11 +92,10 @@ failovermethod=priority
 enabled=0
 
 [pgdg96]
-name=PostgreSQL 9.6 for RHEL/CentOS $releasever - $basearch
+name=PostgreSQL 9.6 for RHEL/CentOS 7 - x86_64
 baseurl=https://download.postgresql.org/pub/repos/yum/9.6/redhat/rhel-7-x86_64
 enabled=1
-gpgcheck=1
-gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-PGDG
+gpgcheck=0
 
 [copr:copr.fedorainfracloud.org:managerforlustre:buildtools]
 name=Copr repo for buildtools owned by managerforlustre
@@ -111,7 +110,7 @@ enabled_metadata=1
 """
 EOF
 
-if { ! [ -f $old ]; } || { ! cmp --silent $old $new; } ; then
+if ! cmp --silent $old $new; then
     mv $new $old;
 fi
 
@@ -121,7 +120,7 @@ su -l mocker << EOF
 mock -r /etc/mock/iml.cfg --init
 mock -r /etc/mock/iml.cfg --copyin /integrated-manager-for-lustre /iml
 mock -r /etc/mock/iml.cfg -i cargo git ed epel-release python-setuptools gcc openssl-devel postgresql96-devel python2-devel python2-setuptools ed
-mock -r /etc/mock/iml.cfg --shell 'export CARGO_HOME=/tmp/.cargo CARGO_TARGET_DIR=/tmp/target && cd /iml && make local TARGET=/tmp/target'
+mock -r /etc/mock/iml.cfg --shell 'export CARGO_HOME=/tmp/.cargo CARGO_TARGET_DIR=/tmp/target && cd /iml && make local'
 mock -r /etc/mock/iml.cfg --copyout /iml/_topdir /tmp/iml/_topdir
 mock -r /etc/mock/iml.cfg --copyout /iml/chroma_support.repo /tmp/iml/
 EOF
