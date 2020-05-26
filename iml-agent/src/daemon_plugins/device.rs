@@ -119,12 +119,15 @@ impl DaemonPlugin for Devices {
             let new = x;
 
             let serialized_recorder = new.as_ref().map(|new| {
-                let mut d: treediff::tools::Merger<
+                let mut d: treediff::tools::my_merger::MyMerger<
                     treediff::value::Key,
                     serde_json::value::Value,
-                    treediff::tools::DefaultMutableFilter,
-                    treediff::tools::DefaultMutableFilter,
-                > = treediff::tools::Merger::from(old.clone());
+                    treediff::tools::my_merger::MyFilter,
+                    treediff::tools::my_merger::MyFilter,
+                > = treediff::tools::my_merger::MyMerger::with_filter(
+                    old.clone(),
+                    treediff::tools::my_merger::MyFilter,
+                );
                 diff(&old, new, &mut d);
                 serde_json::to_value(&d).unwrap()
             });

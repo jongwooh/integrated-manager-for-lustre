@@ -84,11 +84,11 @@ async fn main() -> Result<(), ImlDeviceError> {
     tokio::spawn(server);
 
     let mut s = consume_data::<
-        treediff::tools::Merger<
+        treediff::tools::my_merger::MyMerger<
             treediff::value::Key,
             serde_json::value::Value,
-            treediff::tools::DefaultMutableFilter,
-            treediff::tools::DefaultMutableFilter,
+            treediff::tools::my_merger::MyFilter,
+            treediff::tools::my_merger::MyFilter,
         >,
     >("rust_agent_device_rx");
 
