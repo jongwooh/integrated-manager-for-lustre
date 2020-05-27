@@ -20,6 +20,7 @@ use iml_orm::{
     DbPool,
 };
 use iml_wire_types::Fqdn;
+use serde_json::Value;
 use std::collections;
 
 pub async fn save_devices(devices: Vec<(Fqdn, Device)>, pool: &DbPool) {
@@ -27,6 +28,27 @@ pub async fn save_devices(devices: Vec<(Fqdn, Device)>, pool: &DbPool) {
         let device_to_insert = NewChromaCoreDevice {
             fqdn: f.to_string(),
             devices: serde_json::to_value(d).expect("Could not convert other Device to JSON."),
+        };
+
+        let new_device = diesel::insert_into(table)
+            .values(device_to_insert)
+            .on_conflict(fqdn)
+            .do_update()
+            .set(chroma_core_device::devices.eq(excluded(chroma_core_device::devices)))
+            .get_result_async::<ChromaCoreDevice>(pool)
+            .await
+            .expect("Error saving new device");
+
+        tracing::info!("Inserted devices from host {}", new_device.fqdn);
+        tracing::trace!("Inserted devices {:?}", new_device);
+    }
+}
+
+pub async fn save_devices_json(devices: Vec<(Fqdn, Value)>, pool: &DbPool) {
+    for (f, d) in devices.into_iter() {
+        let device_to_insert = NewChromaCoreDevice {
+            fqdn: f.to_string(),
+            devices: d,
         };
 
         let new_device = diesel::insert_into(table)
@@ -59,6 +81,19 @@ pub async fn get_other_devices(f: &Fqdn, pool: &DbPool) -> Vec<(Fqdn, Device)> {
                     .expect("Couldn't deserialize Device from JSON when reading from DB"),
             )
         })
+        .collect()
+}
+
+pub async fn get_other_devices_json(f: &Fqdn, pool: &DbPool) -> Vec<(Fqdn, Value)> {
+    let other_devices = table
+        .filter(fqdn.ne(f.to_string()))
+        .load_async::<ChromaCoreDevice>(&pool)
+        .await
+        .expect("Error getting devices from other hosts");
+
+    other_devices
+        .into_iter()
+        .map(|d| (Fqdn(d.fqdn), d.devices))
         .collect()
 }
 

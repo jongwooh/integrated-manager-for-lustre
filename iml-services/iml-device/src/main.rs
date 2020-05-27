@@ -11,7 +11,10 @@ use iml_device::{
         build_device_lookup, devtree2linuxoutput, get_shared_pools, populate_zpool, update_vgs,
         LinuxPluginData,
     },
-    virtual_device::{get_other_devices, save_devices, update_virtual_devices},
+    virtual_device::{
+        get_other_devices, get_other_devices_json, save_devices, save_devices_json,
+        update_virtual_devices,
+    },
     ImlDeviceError,
 };
 use iml_orm::{
@@ -135,22 +138,24 @@ async fn main() -> Result<(), ImlDeviceError> {
             "The top device has to be Root"
         );
 
-        let mut all_devices = get_other_devices(&f, &pool).await;
-
-        all_devices.push((f, d));
+        let mut other_devices = get_other_devices_json(&f, &pool).await;
 
         let middle1: DateTime<Local> = Local::now();
 
-        let mut merger =
-            device_tree_merger::MyMerger::with_filter(old.clone(), device_tree_merger::MyFilter);
+        let mut merger = device_tree_merger::MyMerger::with_state(
+            old.clone(),
+            device_tree_merger::MyFilter,
+            f.clone(),
+            other_devices,
+        );
         treediff::diff(&old, &new, &mut merger);
         tracing::info!("Difference: {:?}", merger);
 
-        let updated_devices = update_virtual_devices(all_devices);
+        let updated_devices = merger.into_devices();
 
         let middle2: DateTime<Local> = Local::now();
 
-        save_devices(updated_devices, &pool).await;
+        save_devices_json(updated_devices, &pool).await;
 
         let end: DateTime<Local> = Local::now();
 

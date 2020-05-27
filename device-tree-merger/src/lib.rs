@@ -1,6 +1,7 @@
 use device_types::devices::Device;
 use iml_wire_types::Fqdn;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::{
     borrow::{BorrowMut, Cow},
     fmt::{Debug, Display},
@@ -15,8 +16,9 @@ use treediff::{
 pub struct MyMerger<K, V, BF, F> {
     cursor: Vec<K>,
     inner: V,
+    fqdn: Fqdn,
     filter: BF,
-    devices: Vec<(Fqdn, Device)>,
+    devices: Vec<(Fqdn, V)>,
     _d: PhantomData<F>,
 }
 impl<K, V, BF, F> MutableFilter for MyMerger<K, V, BF, F> {}
@@ -80,6 +82,12 @@ impl<K, V, BF, F> MyMerger<K, V, BF, F> {
         self.inner
     }
 
+    pub fn into_devices(self) -> Vec<(Fqdn, V)> {
+        let mut result = self.devices;
+        result.push((self.fqdn, self.inner));
+        result
+    }
+
     pub fn filter_mut(&mut self) -> &mut BF {
         &mut self.filter
     }
@@ -101,36 +109,13 @@ where
     F: MutableFilter,
     BF: BorrowMut<F>,
 {
-    pub fn with_filter(v: V, f: BF) -> Self {
+    pub fn with_state(v: V, f: BF, fqdn: Fqdn, devices: Vec<(Fqdn, V)>) -> Self {
         MyMerger {
             inner: v,
+            fqdn,
             cursor: Vec::new(),
             filter: f,
-            devices: Vec::new(),
-            _d: PhantomData,
-        }
-    }
-    pub fn with_state(v: V, f: BF, devices: Vec<(Fqdn, Device)>) -> Self {
-        MyMerger {
-            inner: v,
-            cursor: Vec::new(),
-            filter: f,
-            devices: devices,
-            _d: PhantomData,
-        }
-    }
-}
-
-impl<'a, V> From<V> for MyMerger<V::Key, V, DefaultMutableFilter, DefaultMutableFilter>
-where
-    V: Mutable + 'a + Clone,
-{
-    fn from(v: V) -> Self {
-        Self {
-            inner: v,
-            cursor: Vec::new(),
-            filter: DefaultMutableFilter,
-            devices: Vec::new(),
+            devices,
             _d: PhantomData,
         }
     }
