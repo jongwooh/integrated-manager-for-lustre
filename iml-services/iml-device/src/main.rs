@@ -135,17 +135,18 @@ async fn main() -> Result<(), ImlDeviceError> {
             device_tree_merger::MyMerger::with_filter(old.clone(), device_tree_merger::MyFilter);
         treediff::diff(&old, &new, &mut merger);
 
-        // cache.insert(f.clone(), d.clone());
+        let d: Device = serde_json::from_value(new).unwrap();
+        cache.insert(f.clone(), d.clone());
 
         tracing::info!("Difference: {:?}", merger);
 
-        // assert!(
-        //     match d {
-        //         Device::Root(_) => true,
-        //         _ => false,
-        //     },
-        //     "The top device has to be Root"
-        // );
+        assert!(
+            match d {
+                Device::Root(_) => true,
+                _ => false,
+            },
+            "The top device has to be Root"
+        );
 
         // let mut all_devices = get_other_devices(&f, &pool).await;
 
