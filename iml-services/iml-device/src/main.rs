@@ -138,7 +138,7 @@ async fn main() -> Result<(), ImlDeviceError> {
             "The top device has to be Root"
         );
 
-        let mut other_devices = get_other_devices_json(&f, &pool).await;
+        let other_devices = get_other_devices_json(&f, &pool).await;
 
         let middle1: DateTime<Local> = Local::now();
 
