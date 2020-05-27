@@ -14,6 +14,12 @@ use iml_device::{
     virtual_device::{get_other_devices, save_devices, update_virtual_devices},
     ImlDeviceError,
 };
+use iml_orm::{
+    models::{ChromaCoreDevice, NewChromaCoreDevice},
+    schema::chroma_core_device::{devices, fqdn, table},
+    tokio_diesel::*,
+    DbPool,
+};
 use iml_service_queue::service_queue::consume_data;
 use iml_wire_types::Fqdn;
 use std::{
@@ -24,13 +30,32 @@ use warp::Filter;
 
 type Cache = Arc<Mutex<HashMap<Fqdn, Device>>>;
 
+async fn create_cache(pool: &DbPool) -> Result<Cache, ImlDeviceError> {
+    let data: HashMap<Fqdn, Device> = table
+        .load_async(&pool)
+        .await?
+        .into_iter()
+        .map(
+            |x: ChromaCoreDevice| -> Result<(Fqdn, Device), ImlDeviceError> {
+                let d = serde_json::from_value(x.devices)?;
+
+                Ok((Fqdn(x.fqdn), d))
+            },
+        )
+        .collect::<Result<_, _>>()?;
+
+    Ok(Arc::new(Mutex::new(data)))
+}
+
 #[tokio::main]
 async fn main() -> Result<(), ImlDeviceError> {
     iml_tracing::init();
 
     let addr = iml_manager_env::get_device_aggregator_addr();
 
-    let cache = Arc::new(Mutex::new(HashMap::new()));
+    let pool = iml_orm::pool()?;
+
+    let cache = create_cache(&pool).await?;
     let cache2 = Arc::clone(&cache);
     let cache = warp::any().map(move || Arc::clone(&cache));
 

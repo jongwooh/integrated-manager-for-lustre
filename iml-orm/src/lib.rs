@@ -8,11 +8,11 @@
 #[macro_use]
 extern crate diesel;
 
+#[cfg(feature = "postgres-interop")]
 pub mod models;
 #[cfg(feature = "postgres-interop")]
 pub mod schema;
 
-#[cfg(feature = "postgres-interop")]
 pub mod alerts;
 
 #[cfg(feature = "postgres-interop")]
@@ -42,7 +42,11 @@ pub mod step;
 #[cfg(feature = "postgres-interop")]
 pub mod task;
 
+pub mod sfa;
+
+#[cfg(feature = "postgres-interop")]
 use futures::channel::oneshot;
+#[cfg(feature = "postgres-interop")]
 use thiserror::Error;
 
 #[cfg(feature = "warp-filters")]
@@ -52,7 +56,6 @@ use warp::Filter;
 
 #[cfg(feature = "postgres-interop")]
 use diesel::{
-    prelude::RunQueryDsl,
     query_builder::{QueryFragment, QueryId},
     r2d2::{ConnectionManager, Pool},
     PgConnection,
@@ -78,12 +81,16 @@ impl<T> Executable for T where
 pub type DbPool = Pool<ConnectionManager<diesel::PgConnection>>;
 
 #[cfg(feature = "postgres-interop")]
+pub use diesel::query_dsl::RunQueryDsl;
+
+#[cfg(feature = "postgres-interop")]
 pub use tokio_diesel;
 
 #[cfg(feature = "postgres-interop")]
 pub use r2d2;
 
 #[derive(Debug, Error)]
+#[cfg(feature = "postgres-interop")]
 pub enum ImlOrmError {
     #[error(transparent)]
     R2D2Error(#[from] r2d2::Error),
@@ -151,3 +158,72 @@ pub async fn create_pool_filter() -> Result<
 
     Ok((fut, filter))
 }
+
+mod change {
+    use std::{
+        cmp::{Eq, Ord},
+        collections::BTreeSet,
+        fmt::Debug,
+        iter::FromIterator,
+    };
+
+    pub trait Changeable: Eq + Ord + Debug {}
+
+    impl<T> Changeable for T where T: Eq + Ord + Debug {}
+
+    #[derive(Debug)]
+    pub struct Additions<T: Changeable>(pub Vec<T>);
+
+    #[derive(Debug)]
+    pub struct Updates<T: Changeable>(pub Vec<T>);
+
+    #[derive(Debug)]
+    pub struct Deletions<T: Changeable>(pub Vec<T>);
+
+    type Changes<'a, T> = (
+        Option<Additions<&'a T>>,
+        Option<Updates<&'a T>>,
+        Option<Deletions<&'a T>>,
+    );
+
+    pub trait GetChanges<T: Changeable> {
+        /// Given new and old items, this method compares them and
+        /// returns a tuple of `Additions`, `Updates`, and `Deletions`.
+        fn get_changes<'a>(&'a self, old: &'a Self) -> Changes<'a, T>;
+    }
+
+    impl<T: Changeable> GetChanges<T> for Vec<T> {
+        fn get_changes<'a>(&'a self, old: &'a Self) -> Changes<'a, T> {
+            let new = BTreeSet::from_iter(self);
+            let old = BTreeSet::from_iter(old);
+
+            let to_add: Vec<&T> = new.difference(&old).copied().collect();
+
+            let to_add = if to_add.is_empty() {
+                None
+            } else {
+                Some(Additions(to_add))
+            };
+
+            let to_change: Vec<&T> = new.intersection(&old).copied().collect();
+
+            let to_change = if to_change.is_empty() {
+                None
+            } else {
+                Some(Updates(to_change))
+            };
+
+            let to_remove: Vec<&T> = old.difference(&new).copied().collect();
+
+            let to_remove = if to_remove.is_empty() {
+                None
+            } else {
+                Some(Deletions(to_remove))
+            };
+
+            (to_add, to_change, to_remove)
+        }
+    }
+}
+
+pub use change::*;
