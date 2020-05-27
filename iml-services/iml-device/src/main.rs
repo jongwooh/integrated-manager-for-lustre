@@ -124,10 +124,22 @@ async fn main() -> Result<(), ImlDeviceError> {
         let begin: DateTime<Local> = Local::now();
         tracing::info!("Iteration {}: begin: {}", i, begin);
 
-        // let mut cache = cache2.lock().await;
+        let mut cache = cache2.lock().await;
+        let old = cache
+            .get(&f)
+            .map(|old| serde_json::to_value(old).unwrap())
+            .unwrap_or_else(|| serde_json::to_value("{}").unwrap());
+        let new = diff.into_inner();
+
+        let mut merger = treediff::tools::my_merger::MyMerger::with_filter(
+            old.clone(),
+            treediff::tools::my_merger::MyFilter,
+        );
+        treediff::diff(&old, &new, &mut merger);
+
         // cache.insert(f.clone(), d.clone());
 
-        tracing::info!("Difference: {:?}", diff);
+        tracing::info!("Difference: {:?}", merger);
 
         // assert!(
         //     match d {
