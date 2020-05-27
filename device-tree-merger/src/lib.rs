@@ -1,19 +1,22 @@
-use treediff::{
-    tools::{DefaultMutableFilter, MutableFilter},
-    Delegate, Mutable,
-};
+use device_types::devices::Device;
+use iml_wire_types::Fqdn;
+use serde::{Deserialize, Serialize};
 use std::{
     borrow::{BorrowMut, Cow},
     fmt::{Debug, Display},
     marker::PhantomData,
 };
-use serde::{Deserialize, Serialize};
+use treediff::{
+    tools::{DefaultMutableFilter, MutableFilter},
+    Delegate, Mutable,
+};
 
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct MyMerger<K, V, BF, F> {
     cursor: Vec<K>,
     inner: V,
     filter: BF,
+    devices: Vec<(Fqdn, Device)>,
     _d: PhantomData<F>,
 }
 impl<K, V, BF, F> MutableFilter for MyMerger<K, V, BF, F> {}
@@ -103,6 +106,16 @@ where
             inner: v,
             cursor: Vec::new(),
             filter: f,
+            devices: Vec::new(),
+            _d: PhantomData,
+        }
+    }
+    pub fn with_state(v: V, f: BF, devices: Vec<(Fqdn, Device)>) -> Self {
+        MyMerger {
+            inner: v,
+            cursor: Vec::new(),
+            filter: f,
+            devices: devices,
             _d: PhantomData,
         }
     }
@@ -117,6 +130,7 @@ where
             inner: v,
             cursor: Vec::new(),
             filter: DefaultMutableFilter,
+            devices: Vec::new(),
             _d: PhantomData,
         }
     }
@@ -134,7 +148,10 @@ impl MutableFilter for MyFilter {
     ) -> Option<Cow<'a, V>> {
         tracing::info!(
             "keys: {:?}, old: {:?}, new: {:?}, target: {:?}",
-            keys, old, new, target
+            keys,
+            old,
+            new,
+            target
         );
         Some(Cow::Borrowed(new))
     }
@@ -147,7 +164,9 @@ impl MutableFilter for MyFilter {
     ) -> Option<Cow<'a, V>> {
         tracing::info!(
             "keys: {:?}, removed: {:?}, target: {:?}",
-            keys, removed, target
+            keys,
+            removed,
+            target
         );
         None
     }

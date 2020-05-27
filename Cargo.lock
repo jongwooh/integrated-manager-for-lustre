@@ -552,6 +552,8 @@ dependencies = [
 name = "device-tree-merger"
 version = "0.1.0"
 dependencies = [
+ "device-types",
+ "iml-wire-types",
  "serde",
  "serde_json",
  "tracing",
