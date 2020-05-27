@@ -108,37 +108,24 @@ async fn main() -> Result<(), ImlDeviceError> {
 
     tokio::spawn(server);
 
-    let mut s = consume_data::<
-        device_tree_merger::MyMerger<
-            treediff::value::Key,
-            serde_json::value::Value,
-            device_tree_merger::MyFilter,
-            device_tree_merger::MyFilter,
-        >,
-    >("rust_agent_device_rx");
+    let mut s = consume_data::<Device>("rust_agent_device_rx");
 
     let pool = iml_orm::pool().unwrap();
 
     let mut i = 0usize;
-    while let Some((f, diff)) = s.try_next().await? {
+    while let Some((f, d)) = s.try_next().await? {
         let begin: DateTime<Local> = Local::now();
         tracing::info!("Iteration {}: begin: {}", i, begin);
 
         let mut cache = cache2.lock().await;
+
         let old = cache
             .get(&f)
             .map(|old| serde_json::to_value(old).unwrap())
             .unwrap_or_else(|| serde_json::to_value("{}").unwrap());
-        let new = diff.into_inner();
+        let new = serde_json::to_value(d.clone()).unwrap();
 
-        let mut merger =
-            device_tree_merger::MyMerger::with_filter(old.clone(), device_tree_merger::MyFilter);
-        treediff::diff(&old, &new, &mut merger);
-
-        let d: Device = serde_json::from_value(new).unwrap();
         cache.insert(f.clone(), d.clone());
-
-        tracing::info!("Difference: {:?}", merger);
 
         assert!(
             match d {
@@ -148,17 +135,22 @@ async fn main() -> Result<(), ImlDeviceError> {
             "The top device has to be Root"
         );
 
-        // let mut all_devices = get_other_devices(&f, &pool).await;
+        let mut all_devices = get_other_devices(&f, &pool).await;
 
-        // all_devices.push((f, d));
+        all_devices.push((f, d));
 
         let middle1: DateTime<Local> = Local::now();
 
-        // let updated_devices = update_virtual_devices(all_devices);
+        let mut merger =
+            device_tree_merger::MyMerger::with_filter(old.clone(), device_tree_merger::MyFilter);
+        treediff::diff(&old, &new, &mut merger);
+        tracing::info!("Difference: {:?}", merger);
+
+        let updated_devices = update_virtual_devices(all_devices);
 
         let middle2: DateTime<Local> = Local::now();
 
-        // save_devices(updated_devices, &pool).await;
+        save_devices(updated_devices, &pool).await;
 
         let end: DateTime<Local> = Local::now();
 

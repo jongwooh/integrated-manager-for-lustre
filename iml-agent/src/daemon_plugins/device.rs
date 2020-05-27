@@ -14,7 +14,6 @@ use std::{io, pin::Pin, sync::Arc};
 use stream_cancel::{Trigger, Tripwire};
 use tokio::{io::AsyncWriteExt, net::UnixStream};
 use tokio_util::codec::{FramedRead, LinesCodec};
-use treediff::diff;
 
 /// Opens a persistent stream to device scanner.
 fn device_stream() -> impl Stream<Item = Result<String, ImlAgentError>> {
@@ -40,19 +39,14 @@ enum State {
 pub fn create() -> impl DaemonPlugin {
     Devices {
         trigger: None,
-        state: Arc::new(Mutex::new((None, None, State::Sent))),
+        state: Arc::new(Mutex::new((None, State::Sent))),
     }
-}
-
-pub enum Update {
-    Initial(Output),
-    Patch(()),
 }
 
 #[derive(Debug)]
 pub struct Devices {
     trigger: Option<Trigger>,
-    state: Arc<Mutex<(Output, Output, State)>>,
+    state: Arc<Mutex<(Output, State)>>,
 }
 
 #[async_trait]
@@ -87,7 +81,7 @@ impl DaemonPlugin for Devices {
             {
                 let mut lock = state.lock().await;
 
-                lock.1 = x.clone();
+                lock.0 = x.clone();
             }
 
             tokio::spawn(
@@ -98,11 +92,11 @@ impl DaemonPlugin for Devices {
                         async move {
                             let mut lock = state.lock().await;
 
-                            if lock.1 != x {
+                            if lock.0 != x {
                                 tracing::debug!("marking pending (is none: {}) ", x.is_none());
 
-                                lock.1 = x;
-                                lock.2 = State::Pending;
+                                lock.0 = x;
+                                lock.1 = State::Pending;
                             }
 
                             Ok(())
@@ -115,24 +109,7 @@ impl DaemonPlugin for Devices {
                     }),
             );
 
-            let old: serde_json::Value = serde_json::from_str("{}").unwrap();
-            let new = x;
-
-            let serialized_recorder = new.as_ref().map(|new| {
-                let mut d: treediff::tools::my_merger::MyMerger<
-                    treediff::value::Key,
-                    serde_json::value::Value,
-                    treediff::tools::my_merger::MyFilter,
-                    treediff::tools::my_merger::MyFilter,
-                > = treediff::tools::my_merger::MyMerger::with_filter(
-                    old.clone(),
-                    treediff::tools::my_merger::MyFilter,
-                );
-                diff(&old, new, &mut d);
-                serde_json::to_value(&d).unwrap()
-            });
-
-            Ok(serialized_recorder)
+            Ok(x)
         })
     }
     fn update_session(
@@ -143,35 +120,11 @@ impl DaemonPlugin for Devices {
         async move {
             let mut lock = state.lock().await;
 
-            if lock.2 == State::Pending {
+            if lock.1 == State::Pending {
                 tracing::debug!("Sending new value");
-                lock.2 = State::Sent;
+                lock.1 = State::Sent;
 
-                let old = &lock.0;
-                let new = &lock.1;
-
-                let serialized_recorder = old
-                    .as_ref()
-                    .map(|old| {
-                        new.as_ref().map(|new| {
-                            let mut d: device_tree_merger::MyMerger<
-                                treediff::value::Key,
-                                serde_json::value::Value,
-                                device_tree_merger::MyFilter,
-                                device_tree_merger::MyFilter,
-                            > = device_tree_merger::MyMerger::with_filter(
-                                old.clone(),
-                                device_tree_merger::MyFilter,
-                            );
-                            diff(old, new, &mut d);
-                            serde_json::to_value(&d).unwrap()
-                        })
-                    })
-                    .flatten();
-
-                lock.0 = lock.1.clone();
-
-                Ok(serialized_recorder)
+                Ok(lock.0.clone())
             } else {
                 Ok(None)
             }
