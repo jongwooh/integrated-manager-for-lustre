@@ -154,14 +154,14 @@ impl DaemonPlugin for Devices {
                     .as_ref()
                     .map(|old| {
                         new.as_ref().map(|new| {
-                            let mut d: treediff::tools::my_merger::MyMerger<
+                            let mut d: device_tree_merger::MyMerger<
                                 treediff::value::Key,
                                 serde_json::value::Value,
-                                treediff::tools::my_merger::MyFilter,
-                                treediff::tools::my_merger::MyFilter,
-                            > = treediff::tools::my_merger::MyMerger::with_filter(
+                                device_tree_merger::MyFilter,
+                                device_tree_merger::MyFilter,
+                            > = device_tree_merger::MyMerger::with_filter(
                                 old.clone(),
-                                treediff::tools::my_merger::MyFilter,
+                                device_tree_merger::MyFilter,
                             );
                             diff(old, new, &mut d);
                             serde_json::to_value(&d).unwrap()

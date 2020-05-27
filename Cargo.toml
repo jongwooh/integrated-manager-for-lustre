@@ -36,7 +36,8 @@ members = [
     'number-formatter',
     'tokio-runtime-shutdown',
     'version-utils',
-    'wbem-client'
+    'wbem-client',
+    'device-tree-merger',
 ]
 
 exclude = [

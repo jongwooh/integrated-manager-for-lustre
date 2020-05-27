@@ -1,0 +1,11 @@
+[package]
+name = "device-tree-merger"
+version = "0.1.0"
+authors = ["Michael Pankov <work@michaelpankov.com>"]
+edition = "2018"
+
+[dependencies]
+serde_json = "1.0.53"
+treediff = { git = "https://github.com/whamcloud/treediff-rs.git", branch = "key-serde", version = "4.0.0", features = ["with-serde-json"] }
+serde = "1.0.110"
+tracing = "0.1.14"

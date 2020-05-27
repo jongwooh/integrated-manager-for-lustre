@@ -5,6 +5,7 @@ authors = ["IML Team <iml@whamcloud.com>"]
 edition = "2018"
 
 [dependencies]
+device-tree-merger = { path = "../../device-tree-merger" }
 device-types = { version = "0.1", git = "https://github.com/whamcloud/device-scanner.git" }
 diesel = { version = "1.4", default_features = false, features = ["postgres", "r2d2", "chrono", "serde_json"] }
 futures = "0.3"

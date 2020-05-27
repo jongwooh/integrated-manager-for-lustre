@@ -549,6 +549,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "device-tree-merger"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tracing",
+ "treediff",
+]
+
+[[package]]
 name = "device-types"
 version = "0.1.4"
 source = "git+https://github.com/whamcloud/device-scanner.git#fb92f654d4c8f6c949ea30269cb682e4cd6de05e"
@@ -1200,6 +1210,7 @@ dependencies = [
  "bytes",
  "chrono",
  "console 0.11.3",
+ "device-tree-merger",
  "dns-lookup",
  "dotenv",
  "elementtree",
@@ -1300,6 +1311,7 @@ name = "iml-device"
 version = "0.2.0"
 dependencies = [
  "chrono",
+ "device-tree-merger",
  "device-types",
  "diesel",
  "futures",

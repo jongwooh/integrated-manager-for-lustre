@@ -109,11 +109,11 @@ async fn main() -> Result<(), ImlDeviceError> {
     tokio::spawn(server);
 
     let mut s = consume_data::<
-        treediff::tools::my_merger::MyMerger<
+        device_tree_merger::MyMerger<
             treediff::value::Key,
             serde_json::value::Value,
-            treediff::tools::my_merger::MyFilter,
-            treediff::tools::my_merger::MyFilter,
+            device_tree_merger::MyFilter,
+            device_tree_merger::MyFilter,
         >,
     >("rust_agent_device_rx");
 
@@ -131,10 +131,8 @@ async fn main() -> Result<(), ImlDeviceError> {
             .unwrap_or_else(|| serde_json::to_value("{}").unwrap());
         let new = diff.into_inner();
 
-        let mut merger = treediff::tools::my_merger::MyMerger::with_filter(
-            old.clone(),
-            treediff::tools::my_merger::MyFilter,
-        );
+        let mut merger =
+            device_tree_merger::MyMerger::with_filter(old.clone(), device_tree_merger::MyFilter);
         treediff::diff(&old, &new, &mut merger);
 
         // cache.insert(f.clone(), d.clone());
