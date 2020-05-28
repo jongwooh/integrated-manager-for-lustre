@@ -142,10 +142,6 @@ async fn main() -> Result<(), ImlDeviceError> {
 
         let middle1: DateTime<Local> = Local::now();
 
-        // FIXME: We'll be getting differences that say virtual devices from other hosts got removed,
-        // because they are never present in input data
-        // We have to store "verbatim" input data separately to be able to see differences effectively,
-        // then resolve virtual devices and store final state in a different place
         let mut merger = device_tree_merger::MyMerger::with_state(
             old.clone(),
             device_tree_merger::MyFilter,
