@@ -1,9 +1,12 @@
 use device_types::devices::Device;
+use im::OrdSet;
 use iml_wire_types::Fqdn;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{
     borrow::{BorrowMut, Cow},
+    cmp::Ordering,
+    collections::BTreeSet,
     fmt::{Debug, Display},
     marker::PhantomData,
 };
@@ -251,5 +254,120 @@ pub fn to_display(d: &Value) -> String {
             v.as_object().unwrap()["children"].as_array().unwrap().len(),
         ),
         _ => unreachable!(),
+    }
+}
+
+pub fn diff<'a, D>(l: &'a Device, r: &'a Device, d: &mut D)
+where
+    D: Delegate<'a, String, Device>,
+{
+    match (children(l), children(r)) {
+        // two scalars, equal
+        (None, None) if l == r => d.unchanged(l),
+        // two scalars, different
+        (None, None) => d.modified(l, r),
+        // two objects, equal
+        (Some(_), Some(_)) if l == r => d.unchanged(l),
+        // object and scalar
+        (Some(_), None) | (None, Some(_)) => d.modified(l, r),
+        // two objects, different
+        (Some(li), Some(ri)) => {
+            // let mut sl: BTreeSet<OrdByKey<_, _>> = BTreeSet::new();
+            // sl.extend(li.map(Into::into));
+            // let mut sr: BTreeSet<OrdByKey<_, _>> = BTreeSet::new();
+            // sr.extend(ri.map(Into::into));
+            for k in ri.intersection(li) {
+                let v1 = sl.get(k).expect("intersection to work");
+                let v2 = sr.get(k).expect("intersection to work");
+                d.push(&k.0);
+                diff(v1.1, v2.1, d);
+                d.pop();
+            }
+            for k in sr.difference(&sl) {
+                d.added(&k.0, sr.get(k).expect("difference to work").1);
+            }
+            for k in sl.difference(&sr) {
+                d.removed(&k.0, sl.get(k).expect("difference to work").1);
+            }
+        }
+    }
+}
+
+struct OrdByKey<'a, K, V: 'a>(pub K, pub &'a V);
+
+impl<'a, K, V> From<(K, &'a V)> for OrdByKey<'a, K, V> {
+    fn from(src: (K, &'a V)) -> Self {
+        OrdByKey(src.0, src.1)
+    }
+}
+
+impl<'a, K, V> Eq for OrdByKey<'a, K, V> where K: Eq + PartialOrd {}
+
+impl<'a, K, V> PartialEq for OrdByKey<'a, K, V>
+where
+    K: PartialOrd,
+{
+    fn eq(&self, other: &OrdByKey<'a, K, V>) -> bool {
+        self.0.eq(&other.0)
+    }
+}
+
+impl<'a, K, V> PartialOrd for OrdByKey<'a, K, V>
+where
+    K: PartialOrd,
+{
+    fn partial_cmp(&self, other: &OrdByKey<'a, K, V>) -> Option<Ordering> {
+        self.0.partial_cmp(&other.0)
+    }
+}
+
+impl<'a, K, V> Ord for OrdByKey<'a, K, V>
+where
+    K: Ord,
+{
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.0.cmp(&other.0)
+    }
+}
+
+pub fn children_owned(d: Device) -> OrdSet<Device> {
+    match d {
+        Device::Root(dd) => dd.children,
+        Device::ScsiDevice(dd) => dd.children,
+        Device::Partition(dd) => dd.children,
+        Device::MdRaid(dd) => dd.children,
+        Device::Mpath(dd) => dd.children,
+        Device::VolumeGroup(dd) => dd.children,
+        Device::LogicalVolume(dd) => dd.children,
+        Device::Zpool(dd) => dd.children,
+        Device::Dataset(_) => OrdSet::new(),
+    }
+}
+
+pub fn children_mut(d: &mut Device) -> Option<&mut OrdSet<Device>> {
+    match d {
+        Device::Root(dd) => Some(&mut dd.children),
+        Device::ScsiDevice(dd) => Some(&mut dd.children),
+        Device::Partition(dd) => Some(&mut dd.children),
+        Device::MdRaid(dd) => Some(&mut dd.children),
+        Device::Mpath(dd) => Some(&mut dd.children),
+        Device::VolumeGroup(dd) => Some(&mut dd.children),
+        Device::LogicalVolume(dd) => Some(&mut dd.children),
+        Device::Zpool(dd) => Some(&mut dd.children),
+        Device::Dataset(_) => None,
+    }
+}
+
+pub fn children(d: &Device) -> Option<&OrdSet<Device>> {
+    match d {
+        Device::Root(dd) => Some(&dd.children),
+        Device::ScsiDevice(dd) => Some(&dd.children),
+        Device::Partition(dd) => Some(&dd.children),
+        Device::MdRaid(dd) => Some(&dd.children),
+        Device::Mpath(dd) => Some(&dd.children),
+        Device::VolumeGroup(dd) => Some(&dd.children),
+        Device::LogicalVolume(dd) => Some(&dd.children),
+        Device::Zpool(dd) => Some(&dd.children),
+        Device::Dataset(_) => None,
     }
 }

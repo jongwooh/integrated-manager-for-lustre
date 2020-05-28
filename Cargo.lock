@@ -553,6 +553,7 @@ name = "device-tree-merger"
 version = "0.1.0"
 dependencies = [
  "device-types",
+ "im 13.0.0",
  "iml-wire-types",
  "serde",
  "serde_json",
