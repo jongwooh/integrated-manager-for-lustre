@@ -156,3 +156,99 @@ impl MutableFilter for MyFilter {
         None
     }
 }
+
+fn collect_virtual_device_parents<'d>(
+    d: &'d Value,
+    level: usize,
+    parent: Option<&'d Value>,
+) -> Vec<&'d Value> {
+    let mut results = vec![];
+    if is_virtual(d) {
+        tracing::debug!(
+            "Collecting parent {} of {}",
+            parent.map(|x| to_display(x)).unwrap_or("None".into()),
+            to_display(d)
+        );
+        vec![parent.expect("Tried to push to parents the parent of the Root, which doesn't exist")]
+    } else {
+        let o = d.as_object().unwrap();
+        let so = o
+            .get("Root")
+            .or_else(|| o.get("ScsiDevice"))
+            .or_else(|| o.get("Partition"))
+            .or_else(|| o.get("Mpath"));
+        if let Some(so) = so {
+            let cs = &so["children"];
+            let cs = cs.as_array().unwrap();
+            for c in cs {
+                results.extend(collect_virtual_device_parents(c, level + 1, Some(d)));
+            }
+            results
+        } else {
+            vec![]
+        }
+    }
+}
+
+pub fn is_virtual(d: &Value) -> bool {
+    let o = d.as_object().unwrap();
+    // TODO: Rewrite with `contains_key`
+    o.get("Dataset")
+        .or_else(|| o.get("LogicalVolume"))
+        .or_else(|| o.get("MdRaid"))
+        .or_else(|| o.get("VolumeGroup"))
+        .or_else(|| o.get("Zpool"))
+        .is_some()
+}
+
+pub fn to_display(d: &Value) -> String {
+    let mut i = d.as_object().unwrap().iter();
+    let (k, v) = i.next().unwrap();
+    match (k.as_ref(), v) {
+        ("Root", v) => format!(
+            "Root: children: {}",
+            v.as_object().unwrap()["children"].as_array().unwrap().len(),
+        ),
+        ("ScsiDevice", v) => format!(
+            "ScsiDevice: serial: {}, children: {}",
+            v.as_object().unwrap()["serial"].as_str().unwrap(),
+            v.as_object().unwrap()["children"].as_array().unwrap().len(),
+        ),
+        ("Partition", v) => format!(
+            "Partition: serial: {}, children: {}",
+            v.as_object().unwrap()["serial"].as_str().unwrap(),
+            v.as_object().unwrap()["children"].as_array().unwrap().len(),
+        ),
+        ("MdRaid", v) => format!(
+            "MdRaid: uuid: {}, children: {}",
+            v.as_object().unwrap()["uuid"].as_str().unwrap(),
+            v.as_object().unwrap()["children"].as_array().unwrap().len(),
+        ),
+        ("Mpath", v) => format!(
+            "Mpath: serial: {}, children: {}",
+            v.as_object().unwrap()["serial"].as_str().unwrap(),
+            v.as_object().unwrap()["children"].as_array().unwrap().len(),
+        ),
+        ("VolumeGroup", v) => format!(
+            "VolumeGroup: uuid: {}, children: {}",
+            v.as_object().unwrap()["uuid"].as_str().unwrap(),
+            v.as_object().unwrap()["children"].as_array().unwrap().len(),
+        ),
+        ("LogicalVolume", v) => format!(
+            "LogicalVolume: uuid: {}, children: {}",
+            v.as_object().unwrap()["uuid"].as_str().unwrap(),
+            v.as_object().unwrap()["children"].as_array().unwrap().len(),
+        ),
+        ("Zpool", v) => format!(
+            "Zpool: guid: {}, children: {}",
+            v.as_object().unwrap()["guid"].as_u64().unwrap(),
+            v.as_object().unwrap()["children"].as_array().unwrap().len(),
+        ),
+        ("Dataset", v) => format!(
+            "Dataset: guid: {}, children: {}",
+            v.as_object().unwrap()["guid"].as_u64().unwrap(),
+            v.as_object().unwrap()["children"].as_array().unwrap().len(),
+        ),
+        _ => unreachable!(),
+    }
+}
