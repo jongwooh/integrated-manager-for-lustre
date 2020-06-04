@@ -30,11 +30,13 @@ impl DaemonPlugin for SizeTest {
     ) -> Pin<Box<dyn Future<Output = Result<Output, ImlAgentError>> + Send>> {
         async move {
             {
-                let mut data = Vec::with_capacity(4096);
-                for _ in 0..4096 {
+                let mut data = Vec::with_capacity(16384);
+                for _ in 0..16384 {
                     data.push(Datum { datum: [0; 32] });
                 }
                 let serialized = serde_json::to_value(&data).unwrap();
+                let string = serde_json::to_string(&data).unwrap();
+                tracing::info!("Sending {} bytes (create_session)", string.len());
                 Ok(Some(serialized))
             }
         }
@@ -44,12 +46,14 @@ impl DaemonPlugin for SizeTest {
         &self,
     ) -> Pin<Box<dyn Future<Output = Result<Output, ImlAgentError>> + Send>> {
         async move {
-            let mut data = Vec::with_capacity(4096);
-            for _ in 0..4096 {
+            let mut data = Vec::with_capacity(16384);
+            for _ in 0..16384 {
                 data.push(Datum { datum: [0; 32] });
             }
             let serialized = serde_json::to_value(&data).unwrap();
-            Ok(Some(serialized))
+            let string = serde_json::to_string(&data).unwrap();
+            tracing::info!("Sending {} bytes", string.len());
+        Ok(Some(serialized))
         }
         .boxed()
     }
