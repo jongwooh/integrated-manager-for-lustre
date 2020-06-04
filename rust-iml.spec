@@ -33,6 +33,7 @@ cp iml-agent-daemon %{buildroot}%{_bindir}
 cp iml-api %{buildroot}%{_bindir}
 cp iml-ostpool %{buildroot}%{_bindir}
 cp iml-device %{buildroot}%{_bindir}
+cp iml-size-test %{buildroot}%{_bindir}
 cp iml-stats %{buildroot}%{_bindir}
 cp iml-agent-comms %{buildroot}%{_bindir}
 cp iml-action-runner %{buildroot}%{_bindir}
@@ -44,6 +45,7 @@ cp iml-sfa %{buildroot}%{_bindir}
 mkdir -p %{buildroot}%{_unitdir}
 cp iml-api.service %{buildroot}%{_unitdir}
 cp iml-device.service %{buildroot}%{_unitdir}
+cp iml-size-test.service %{buildroot}%{_unitdir}
 cp iml-ostpool.service %{buildroot}%{_unitdir}
 cp iml-rust-stats.service %{buildroot}%{_unitdir}
 cp iml-agent-comms.service %{buildroot}%{_unitdir}
@@ -343,6 +345,28 @@ systemctl preset iml-device.service
 %files device
 %{_bindir}/iml-device
 %attr(0644,root,root)%{_unitdir}/iml-device.service
+
+%package size-test
+Summary: Consumer of IML Agent size-test push queue
+License: MIT
+Group: System Environment/Libraries
+Requires: rust-iml-agent-comms
+
+%description size-test
+%{summary}
+
+%post size-test
+systemctl preset iml-size-test.service
+
+%preun size-test
+%systemd_preun iml-size-test.service
+
+%postun size-test
+%systemd_postun_with_restart iml-size-test.service
+
+%files size-test
+%{_bindir}/iml-size-test
+%attr(0644,root,root)%{_unitdir}/iml-size-test.service
 
 %changelog
 * Wed Sep 18 2019 Will Johnson <wjohnson@whamcloud.com> - 0.2.0-1 

@@ -1566,6 +1566,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "iml-size-test"
+version = "0.2.0"
+dependencies = [
+ "device-types",
+ "diesel",
+ "futures",
+ "iml-manager-env",
+ "iml-orm",
+ "iml-postgres",
+ "iml-rabbit",
+ "iml-service-queue",
+ "iml-tracing",
+ "iml-wire-types",
+ "insta",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "warp",
+]
+
+[[package]]
 name = "iml-stats"
 version = "0.2.0"
 dependencies = [

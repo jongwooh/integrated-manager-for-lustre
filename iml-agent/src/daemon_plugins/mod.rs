@@ -15,6 +15,7 @@ pub mod device;
 pub mod ntp;
 pub mod ostpool;
 pub mod postoffice;
+pub mod size_test;
 pub mod stats;
 
 pub use daemon_plugin::{

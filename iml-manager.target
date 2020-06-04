@@ -79,6 +79,9 @@ After=grafana-server.service
 Requires=iml-device.service
 After=iml-device.service
 
+Requires=iml-size-test.service
+After=iml-size-test.service
+
 After=network.target
 
 [Install]
@@ -89,6 +92,7 @@ Also=iml-agent-comms.service
 Also=iml-api.service
 Also=iml-corosync.service
 Also=iml-device.service
+Also=iml-size-test.service
 Also=iml-gunicorn.service
 Also=iml-http-agent.service
 Also=iml-job-scheduler.service

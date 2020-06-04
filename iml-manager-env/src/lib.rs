@@ -206,6 +206,14 @@ pub fn get_device_aggregator_addr() -> SocketAddr {
     to_socket_addr(&get_server_host(), &get_device_aggregator_port())
 }
 
+pub fn get_size_test_port() -> String {
+    get_var("SIZE_TEST_PORT")
+}
+
+pub fn get_size_test_addr() -> SocketAddr {
+    to_socket_addr(&get_server_host(), &get_size_test_port())
+}
+
 /// Get the api key from the env or panic
 pub fn get_api_key() -> String {
     get_var("API_KEY")
