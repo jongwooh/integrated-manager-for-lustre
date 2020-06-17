@@ -16,7 +16,7 @@ iml-api-utils = { path = "../iml-api-utils", version = "0.3" }
 iml-influx = { path = "../iml-influx", version = "0.1" }
 iml-manager-client = { path = "../iml-manager-client", version = "0.3" }
 iml-orm = { path = "../iml-orm", version = "0.3", features = ["postgres-interop"]}
-iml-tracing = { version = "0.2", path="../iml-tracing"}
+iml-tracing = { path="../iml-tracing", version = "0.2" }
 iml-wire-types = { path = "../iml-wire-types", version = "0.3" }
 indicatif = "0.15.0"
 lazy_static = "1.4.0"
